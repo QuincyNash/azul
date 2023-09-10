@@ -9,7 +9,6 @@ import pickle
 import pygame
 from pygame import gfxdraw
 from player import Player
-import copy
 
 
 Factory = Counter[Union[Tile, Literal["STARTING_MARKER"]]]
@@ -46,7 +45,7 @@ class Game:
         self.new_round()
 
     def copy(self) -> Game:
-        return copy.deepcopy(self)
+        return pickle.loads(pickle.dumps(self, -1))
 
     def random_tile(self) -> Tile:
         return random.choice(TILE_TYPES)
@@ -165,7 +164,7 @@ class Game:
                         pattern_lines[row_index].tile = EMPTY
 
                         # Count the points by the number of adjacent tiles in each direction
-                        for xdir, ydir in [[-1, 0], [1, 0], [0, -1], [0, 1]]:
+                        for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                             # Continue counting while tiles are filled
                             xpos, ypos = column_index + xdir, row_index + ydir
                             while (
@@ -185,6 +184,9 @@ class Game:
                 leftover = max(len(player.floor) - len(NEGATIVE_FLOOR_POINTS), 0)
                 player.points -= sum(NEGATIVE_FLOOR_POINTS[: len(player.floor)])
                 player.points -= 3 * leftover
+
+                # Points can't go below 0
+                player.points = max(player.points, 0)
 
                 # And remove the floor tiles
                 player.floor = []
@@ -218,13 +220,10 @@ class Game:
                     if index == 0:
                         factory_copy: Factory = Counter()
                         # If neither player has the starting marker, give it to the player who just moved
-                        if (
+                        first_draw_from_center = (
                             not self.players[0].has_starting_marker
                             and not self.players[1].has_starting_marker
-                        ):
-                            first_draw_from_center = True
-                        else:
-                            first_draw_from_center = False
+                        )
                     else:
                         factory_copy = factory.copy()
                         factory_copy[tile] = 0
@@ -391,7 +390,7 @@ class Game:
                     )
 
     def render(
-        self, *, player1_wins=-1, player2_wins=-1, no_tiles_but_wall=False
+        self, *, player1_wins=-1, player2_wins=-1, ties=-1, no_tiles_but_wall=False
     ) -> None:
         canvas.fill(COLOR_WHITE)
 
@@ -445,3 +444,14 @@ class Game:
                         IMAGES[tile_type].normal,
                         (position.x, position.y),
                     )
+
+        # Ties
+        if ties != -1:
+            text = MAIN_FONT.render(f"Ties: {ties}", True, COLOR_BLACK)
+            text_rect = text.get_rect(
+                center=(
+                    PLAYER_WIDTH + CENTER_SIZE / 2,
+                    CENTER_SIZE - SCORE_HEIGHT / 2,
+                )
+            )
+            canvas.blit(text, text_rect)
