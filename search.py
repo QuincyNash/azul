@@ -44,21 +44,22 @@ def get_best_move(
     total_nodes = 0
     unique_nodes = 0
     transposition_lookups = 0
-    start_time = time.time()
+    start_time = time.perf_counter()
     result: Union[EvaluatedNode, FinalResult, None] = None
     move_order: List[int] = []
 
-    # Iterative deepening
+    player_eval = player1_eval if turn == 0 else player2_eval
 
-    for d in range(1, 999):
-        current_time = time.time()
+    # Iterative deepening
+    for d in range(1, 25):
+        current_time = time.perf_counter()
         time_left = start_time - current_time + search_time
 
         if time_left <= 0:
             break
 
         result = negascout(
-            player1_eval if turn == 0 else player2_eval,
+            player_eval,
             game,
             turn,
             d,
@@ -77,7 +78,7 @@ def get_best_move(
         transposition_lookups += result.transposition_lookups
 
     table.clear()
-    # print(unique_nodes, total_nodes, transposition_lookups, time.time() - start_time)
+    # print(unique_nodes, total_nodes, transposition_lookups, time.perf_counter() - start_time)
 
     if isinstance(result, FinalResult):
         result.move = pickle.loads(pickle.dumps(result.move, -1))
@@ -98,11 +99,11 @@ def negascout(
     max_depth: int,
     *,
     time_left: float = 999999,
-    move_order: List[int] = [],
+    move_order: Union[List[int], None] = None,
     alpha: float = -999999,
     beta: float = 999999,
 ) -> Union[EvaluatedNode, FinalResult]:
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     all_moves = game.all_moves(turn)
 
@@ -110,6 +111,9 @@ def negascout(
     nodes = 0
     unique_nodes = 0
     transposition_lookups = 0
+
+    if move_order == None:
+        move_order = []
 
     # Sort moves based on move_order
     if len(move_order) > 0:
@@ -178,7 +182,7 @@ def negascout(
     for index, move in enumerate(iterator):
         new_state = game.get_state_after_move(turn, move)
 
-        if time.time() - start_time > time_left:
+        if time.perf_counter() - start_time > time_left:
             break
 
         # Basic alpha beta pruning
