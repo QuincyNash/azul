@@ -9,9 +9,9 @@ class TileImage:
     normal: pygame.Surface
 
 
-COMPUTER_MOVE_TIME = 1  # seconds
+COMPUTER_MOVE_TIME = 0.1  # seconds
 NUM_COMPARE_ROUNDS = 100
-PLAYER1_COMPARE_VERSION = "v1"
+PLAYER1_COMPARE_VERSION = "v2"
 PLAYER2_COMPARE_VERSION = "v2"
 
 
