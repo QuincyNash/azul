@@ -9,18 +9,15 @@ from tqdm import tqdm
 from importlib import import_module
 
 
-# start = time.time()
+# start = time.perf_counter()
 # for i in range(10000):
 #     game.all_moves(0)
-# print(time.time() - start)
+# print(time.perf_counter() - start)
 
 player1_eval = load_player_eval(PLAYER1_COMPARE_VERSION)
 player2_eval = load_player_eval(PLAYER2_COMPARE_VERSION)
 
-game = Game(seed=0)
-
-print(player1_eval["player_evaluation"](game, game.players[0]))
-print(player2_eval["player_evaluation"](game, game.players[0]))
+game = Game()
 
 pygame.event.set_allowed([pygame.QUIT])
 pygame.display.set_caption("Azul")
@@ -33,7 +30,7 @@ player1_wins = 0
 player2_wins = 0
 ties = 0
 
-game.render(player1_wins=0, player2_wins=0)
+game.render(player1_wins=0, player2_wins=0, ties=0)
 pygame.display.update()
 
 while not quit:
@@ -68,7 +65,8 @@ while not quit:
 
             # Restart round if finished
             else:
-                game.new_round()
+                # Assign turn to whoever drew the starting marker
+                turn = game.new_round()
 
         else:
             result = get_best_move(
@@ -80,7 +78,7 @@ while not quit:
             game = game.get_state_after_move(turn, result.move)
             turn = (turn + 1) % 2
 
-        game.render(player1_wins=player1_wins, player2_wins=player2_wins)
+        game.render(player1_wins=player1_wins, player2_wins=player2_wins, ties=ties)
         pygame.display.update()
 
         clock.tick(FRAME_RATE)
