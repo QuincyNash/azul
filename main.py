@@ -11,12 +11,12 @@ import time
 
 
 if __name__ == "__main__":
-    # start = time.time()
+    # start = time.perf_counter()
     # for i in range(10000):
     #     game.all_moves(0)
-    # print(time.time() - start)
+    # print(time.perf_counter() - start)
 
-    game = Game(seed=0)
+    game = Game()
 
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
