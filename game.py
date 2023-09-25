@@ -1,16 +1,22 @@
 from __future__ import annotations
+import struct
+from typing import Callable, List, Tuple
 from constants import *
 from dataclasses import dataclass
 from collections import Counter
-from typing import Callable, List
 import random
 import math
 import pickle
 import pygame
 from pygame import gfxdraw
-from player import Player
+from player import PatternLine, Player
 
 
+move_counter = 0
+serialize_counter = 0
+points_counter = 0
+make_move_counter = 0
+no_move_counter = 0
 Factory = Counter[Union[Tile, Literal["STARTING_MARKER"]]]
 
 
@@ -25,6 +31,20 @@ class Move:
     floor_tiles: List[Tile]
     is_center_draw: bool
     first_draw_from_center: bool
+
+
+@dataclass(slots=True)
+class PointChange:
+    pattern_line: int
+    tile: Tile
+    points: int
+
+
+@dataclass(slots=True)
+class PointsResult:
+    point_changes: List[PointChange]
+    bonus_points: int
+    negative_floor_points: int
 
 
 class Game:
@@ -50,34 +70,32 @@ class Game:
     def random_tile(self) -> Tile:
         return random.choice(TILE_TYPES)
 
-    def serialize(self) -> str:
-        result = ""
-
-        get_unique_number: Callable[[Factory], str] = lambda factory: (
-            str(
+    def get_factory_number(self, factory: Factory):
+        return struct.pack(
+            "!Q",
+            (
                 factory[RED]
                 + factory[BLUE] * 8
                 + factory[YELLOW] * 64
                 + factory[BLACK] * 512
                 + factory[STAR] * 4096
-            )
+            ),
         )
 
-        factory_numbers = list(map(get_unique_number, self.factories))
+    def serialize(self) -> bytes:
+        result: bytes = b""
+
+        factory_numbers = list(map(self.get_factory_number, self.factories))
         factory_numbers.sort()
-        factory_numbers.append(get_unique_number(self.center_pile))
-        result += "".join(factory_numbers)
+        factory_numbers.append(self.get_factory_number(self.center_pile))
+        result += b"".join(factory_numbers)
 
         for player in self.players:
-            result += str(player.has_starting_marker)
-            result += str(len(player.floor))
-            result += str(player.points)
-            result += "".join(
-                map(lambda line: f"{line.tile[:3]}{line.space}", player.pattern_lines)
-            )
-            result += "".join(
-                map(lambda line: "".join(map(lambda b: str(int(b)), line)), player.wall)
-            )
+            result += bytes(player.has_starting_marker)
+            result += bytes(len(player.floor))
+            result += bytes(player.points)
+            result += b"".join(map(bytes, player.pattern_lines))
+            result += b"".join(map(bytes, player.wall))
 
         return result
 
@@ -102,7 +120,7 @@ class Game:
     # Reset all factories and the starting marker
     def new_round(self) -> int:
         for factory in self.factories:
-            tiles = [self.random_tile() for _ in range(TILE_PER_FACTORY)]
+            tiles = [self.random_tile() for _ in range(TILES_PER_FACTORY)]
             for tile in TILE_TYPES:
                 factory[tile] = tiles.count(tile)
 
@@ -115,10 +133,8 @@ class Game:
 
         return first_player
 
-    def get_state_after_move(self, player_index: int, move: Move) -> Game:
-        # Copy game to prevent original game from being modified
-        game_copy = self.copy()
-        player: Player = game_copy.players[player_index]
+    def make_move(self, player_index: int, move: Move) -> None:
+        player: Player = self.players[player_index]
         line = player.pattern_lines[move.pattern_line]
 
         # Add tiles to pattern line
@@ -130,25 +146,77 @@ class Game:
         if move.first_draw_from_center:
             player.floor.insert(0, STARTING_MARKER)
             player.has_starting_marker = True
-            game_copy.center_pile[STARTING_MARKER] = 0
+            self.center_pile[STARTING_MARKER] = 0
 
         player.floor.extend(move.floor_tiles)
 
         if move.is_center_draw:
             # Remove tiles from center
-            game_copy.center_pile[move.drawing] = 0
+            self.center_pile[move.drawing] = 0
         else:
             # Move tiles to center
-            game_copy.center_pile += move.moving_to_center
+            self.center_pile.update(move.moving_to_center)
             # Remove tiles from factory
-            game_copy.factories[move.factory_index] = Counter()
+            self.factories[move.factory_index] = Counter()
 
-        return game_copy
+    def undo_move(self, player_index: int, move: Move) -> None:
+        player = self.players[player_index]
+        factory = self.factories[move.factory_index]
+        line = player.pattern_lines[move.pattern_line]
+        line_length = move.pattern_line + 1
 
-    def calculate_points(
+        # Remove tiles from pattern line
+        if move.amount != 0:
+            line.tile = (
+                EMPTY if line_length - line.space == move.amount else move.drawing
+            )
+            line.space += move.amount
+
+        # If the move is the first draw from the center, move the starting marker back to the center pile
+        if move.first_draw_from_center:
+            player.floor.pop(0)
+            player.has_starting_marker = False
+            self.center_pile[STARTING_MARKER] = 1
+
+        if len(move.floor_tiles) > 0:
+            # Add tiles back to factory
+            if move.is_center_draw:
+                self.center_pile[move.floor_tiles[0]] += len(move.floor_tiles)
+            else:
+                factory[move.floor_tiles[0]] += len(move.floor_tiles)
+
+            # Remove tiles from floor
+            player.floor = player.floor[: -len(move.floor_tiles)]
+
+        if move.is_center_draw:
+            # Add tiles back to center
+            self.center_pile[move.drawing] += move.amount
+        else:
+            # Remove tiles from center
+            self.center_pile.subtract(move.moving_to_center)
+            # Add tiles back to factory
+            factory[move.drawing] += move.amount
+            factory.update(move.moving_to_center)
+
+    def calculate_points_and_modify(
         self, *, flag: Literal["bonus_only", "include_bonus", "normal"] = "normal"
     ) -> None:
+        self.calculate_points(flag=flag, modify_game=True)
+
+    def calculate_points(
+        self,
+        *,
+        flag: Literal["bonus_only", "include_bonus", "normal"] = "normal",
+        modify_game=False,
+    ) -> List[PointsResult]:
+        results: List[PointsResult] = []
+
         for player in self.players:
+            total_positive_points = 0
+            bonus_points = 0
+            floor_negative_points = 0
+            point_changes: List[PointChange] = []
+
             # For every line, if it is full, move a tile to the wall
             wall, pattern_lines = player.wall, player.pattern_lines
 
@@ -157,11 +225,17 @@ class Game:
                 for row_index, line in enumerate(pattern_lines):
                     if line.space == 0 and line.tile != EMPTY:
                         column_index = TILE_POSITIONS[line.tile][row_index]
+
+                        # Add tile to wall
+                        # Even if not modified, if modified, remove later
                         wall[row_index][column_index] = True
 
-                        # Remove tiles from pattern line
-                        pattern_lines[row_index].space = row_index + 1
-                        pattern_lines[row_index].tile = EMPTY
+                        if modify_game:
+                            # Remove tiles from pattern line
+                            pattern_lines[row_index].space = row_index + 1
+                            pattern_lines[row_index].tile = EMPTY
+
+                        tile_points = 0
 
                         # Count the points by the number of adjacent tiles in each direction
                         for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
@@ -172,41 +246,81 @@ class Game:
                                 and 0 <= ypos < WALL_SIZE
                                 and wall[ypos][xpos]
                             ):
-                                player.points += 1
+                                if modify_game:
+                                    player.points += 1
+                                tile_points += 1
+                                total_positive_points += 1
+
                                 xpos += xdir
                                 ypos += ydir
 
-                        # Make sure to count the tile that was placed
-                        player.points += 1
+                        total_positive_points += 1
 
-                # Make sure to subtract the floor points
-                # Leftover floor points count as -3
-                leftover = max(len(player.floor) - len(NEGATIVE_FLOOR_POINTS), 0)
-                player.points -= sum(NEGATIVE_FLOOR_POINTS[: len(player.floor)])
-                player.points -= 3 * leftover
-
-                # Points can't go below 0
-                player.points = max(player.points, 0)
-
-                # And remove the floor tiles
-                player.floor = []
+                        if modify_game:
+                            # Make sure to count the tile that was placed
+                            player.points += 1
+                        else:
+                            point_changes.append(
+                                # Make sure to count the tile that was placed (+1)
+                                PointChange(row_index, line.tile, tile_points + 1)
+                            )
 
             # Calculate bonus points
             if flag in ["include_bonus", "bonus_only"]:
                 for row in player.wall:
                     if all(row):
-                        player.points += HORIZONTAL_LINE_BONUS
+                        bonus_points += HORIZONTAL_LINE_BONUS
 
                 for column in zip(*player.wall):
                     if all(column):
-                        player.points += VERTICAL_LINE_BONUS
+                        bonus_points += VERTICAL_LINE_BONUS
 
                 for tile in TILE_TYPES:
                     if all(
                         player.wall[row][TILE_POSITIONS[tile][row]]
                         for row in range(WALL_SIZE)
                     ):
-                        player.points += FIVE_OF_A_KIND_BONUS
+                        bonus_points += FIVE_OF_A_KIND_BONUS
+
+                total_positive_points += bonus_points
+
+                if modify_game:
+                    player.points += bonus_points
+
+            # Reset wall tiles
+            for point_change in point_changes:
+                wall[point_change.pattern_line][
+                    TILE_POSITIONS[point_change.tile][point_change.pattern_line]
+                ] = False
+
+            if flag != "bonus_only":
+                # Make sure to subtract the floor points
+                # Leftover floor points count as -3
+                leftover = max(len(player.floor) - len(NEGATIVE_FLOOR_POINTS), 0)
+                floor_negative_points += sum(NEGATIVE_FLOOR_POINTS[: len(player.floor)])
+                floor_negative_points += 3 * leftover
+
+                # Points can't go below 0
+                floor_negative_points = min(
+                    floor_negative_points, total_positive_points
+                )
+
+                if modify_game:
+                    player.points -= floor_negative_points
+                    # And remove the floor tiles
+                    player.floor = []
+
+            results.append(
+                PointsResult(point_changes, bonus_points, floor_negative_points)
+            )
+
+        return results
+
+    def are_no_moves(self) -> bool:
+        return (
+            all(factory == Counter() for factory in self.factories)
+            and self.center_pile == Counter()
+        )
 
     def all_moves(self, player_index: int) -> List[Move]:
         moves: List[Move] = []
