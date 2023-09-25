@@ -14,6 +14,9 @@ class PatternLine:
     tile: Union[Tile, Literal["EMPTY"]]
     space: int
 
+    def __bytes__(self) -> bytes:
+        return BYTE_CONVERSION[self.tile] + bytes(self.space)
+
 
 class Player:
     def __init__(self, index: int) -> None:
