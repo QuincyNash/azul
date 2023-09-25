@@ -31,7 +31,7 @@ class FinalResult(EvaluatedNode):
     move_order: List[int]
 
 
-table: Dict[str, SearchedNode] = {}
+table: Dict[bytes, SearchedNode] = {}
 
 
 def get_best_move(
@@ -51,7 +51,7 @@ def get_best_move(
     player_eval = player1_eval if turn == 0 else player2_eval
 
     # Iterative deepening
-    for d in range(1, 25):
+    for d in range(1, 4 * FACTORY_COUNT + 1):
         current_time = time.perf_counter()
         time_left = start_time - current_time + search_time
 
@@ -60,12 +60,13 @@ def get_best_move(
 
         result = negascout(
             player_eval,
-            game,
+            game.copy(),
             turn,
             d,
             d,
             move_order=move_order,
             time_left=time_left,
+            show_progress=True,
         )
 
         if isinstance(result, FinalResult) and result.move_order != None:
@@ -102,15 +103,58 @@ def negascout(
     move_order: Union[List[int], None] = None,
     alpha: float = -999999,
     beta: float = 999999,
+    show_progress: bool = False,
 ) -> Union[EvaluatedNode, FinalResult]:
     start_time = time.perf_counter()
-
-    all_moves = game.all_moves(turn)
 
     alpha_orig = alpha
     nodes = 0
     unique_nodes = 0
     transposition_lookups = 0
+
+    # Make sure that the game is not on the first turn of the tree (leads to problems with EvaluatedNode vs. FinalResult)
+    if depth < max_depth:
+        table_entry = table.get(game.serialize())
+
+        # See if this position is in the transposition table
+        if table_entry != None and table_entry.depth >= depth:
+            if table_entry.flag == "exact":
+                return EvaluatedNode(
+                    score=table_entry.score,
+                    unique_nodes_searched=0,
+                    nodes_searched=1,
+                    transposition_lookups=1,
+                )
+            elif table_entry.flag == "lower":
+                alpha = max(alpha, table_entry.score)
+                transposition_lookups += 1
+            elif table_entry.flag == "upper":
+                beta = min(beta, table_entry.score)
+                transposition_lookups += 1
+
+            if alpha >= beta:
+                return EvaluatedNode(
+                    score=table_entry.score,
+                    unique_nodes_searched=0,
+                    nodes_searched=1,
+                    transposition_lookups=transposition_lookups,
+                )
+
+    # # Make sure that the game is not on the first turn of the tree (leads to problems with EvaluatedNode vs. FinalResult)
+    if depth < max_depth and (depth == 0 or game.are_no_moves()):
+        points_results = game.calculate_points(flag="include_bonus")
+
+        # Flip heuristic for player 2
+        return EvaluatedNode(
+            score=game_evaluation_for_player(
+                turn, points_results, player_eval["player_evaluation"]
+            ),
+            unique_nodes_searched=1,
+            nodes_searched=1,
+            transposition_lookups=0,
+        )
+
+    all_moves = game.all_moves(turn)
 
     if move_order == None:
         move_order = []
@@ -123,45 +167,8 @@ def negascout(
         all_moves = [x[1] for x in moves_and_scores]
     else:
         # Use basic evaluation
-        all_moves.sort(key=player_eval["move_potential"], reverse=True)
-
-    # See if this position is in the transposition table
-    table_entry = table.get(game.serialize())
-
-    if table_entry != None and table_entry.depth >= depth:
-        if table_entry.flag == "exact":
-            return EvaluatedNode(
-                score=table_entry.score,
-                unique_nodes_searched=0,
-                nodes_searched=1,
-                transposition_lookups=1,
-            )
-        elif table_entry.flag == "lower":
-            alpha = max(alpha, table_entry.score)
-            transposition_lookups += 1
-        elif table_entry.flag == "upper":
-            beta = min(beta, table_entry.score)
-            transposition_lookups += 1
-
-        if alpha >= beta:
-            return EvaluatedNode(
-                score=table_entry.score,
-                unique_nodes_searched=0,
-                nodes_searched=1,
-                transposition_lookups=transposition_lookups,
-            )
-
-    if depth == 0 or len(all_moves) == 0:
-        game.calculate_points(flag="include_bonus")
-
-        # Flip heuristic for player 2
-        return EvaluatedNode(
-            score=game_evaluation_for_player(
-                turn, game, player_eval["player_evaluation"]
-            ),
-            unique_nodes_searched=1,
-            nodes_searched=1,
-            transposition_lookups=0,
+        all_moves.sort(
+            key=lambda move: player_eval["move_potential"](game, move), reverse=True
         )
 
     move_scores: List[Tuple[int, float]] = []
@@ -175,15 +182,19 @@ def negascout(
         transposition_lookups=0,
     )
 
-    # Progress bar
-    # iterator = tqdm(all_moves) if depth == max_depth else all_moves
-    iterator = all_moves
-
-    for index, move in enumerate(iterator):
-        new_state = game.get_state_after_move(turn, move)
+    # Tqdm is for a progress bar
+    for index, move in enumerate(tqdm(all_moves) if show_progress else all_moves):
+        game.make_move(turn, move)
 
         if time.perf_counter() - start_time > time_left:
-            break
+            return FinalResult(
+                move=best_move,
+                move_order=[],
+                score=best_score,
+                unique_nodes_searched=unique_nodes,
+                nodes_searched=nodes,
+                transposition_lookups=transposition_lookups,
+            )
 
         # Basic alpha beta pruning
         # result = negascout(
@@ -203,7 +214,7 @@ def negascout(
         if index == 0:
             result = negascout(
                 player_eval,
-                new_state,
+                game,
                 (turn + 1) % 2,
                 depth - 1,
                 max_depth,
@@ -218,7 +229,7 @@ def negascout(
             # Null window search
             result = negascout(
                 player_eval,
-                new_state,
+                game,
                 (turn + 1) % 2,
                 depth - 1,
                 max_depth,
@@ -234,7 +245,7 @@ def negascout(
             if alpha < result.score < beta:
                 result = negascout(
                     player_eval,
-                    new_state,
+                    game,
                     (turn + 1) % 2,
                     depth - 1,
                     max_depth,
@@ -245,6 +256,8 @@ def negascout(
                 nodes += result.nodes_searched
                 unique_nodes += result.unique_nodes_searched
                 transposition_lookups += result.transposition_lookups
+
+        game.undo_move(turn, move)
 
         if depth == max_depth:
             move_scores.append((index, result.score))
@@ -270,7 +283,6 @@ def negascout(
     table_entry.depth = depth
     table[game.serialize()] = table_entry
 
-    # Types are ignored here because best_move will always be a valid move, never None
     return FinalResult(
         move=best_move,
         move_order=new_move_order,
