@@ -40,11 +40,11 @@ while not quit:
 
     if not end:
         if game.is_round_over():
-            game.calculate_points()
+            game.calculate_points_and_modify()
 
             # Restart game if finished
             if game.is_game_over():
-                game.calculate_points(flag="bonus_only")
+                game.calculate_points_and_modify(flag="bonus_only")
 
                 score_difference = game.players[0].points - game.players[1].points
                 if score_difference > 0:
@@ -70,12 +70,12 @@ while not quit:
 
         else:
             result = get_best_move(
-                player1_eval, player2_eval, game, turn, COMPUTER_MOVE_TIME
+                player1_eval, player2_eval, game, turn, COMPARE_COMPUTER_MOVE_TIME
             )
 
             # print(result.score, result.nodes_searched)
 
-            game = game.get_state_after_move(turn, result.move)
+            game.make_move(turn, result.move)
             turn = (turn + 1) % 2
 
         game.render(player1_wins=player1_wins, player2_wins=player2_wins, ties=ties)
