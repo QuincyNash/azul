@@ -1,15 +1,15 @@
 from __future__ import annotations
-import struct
-from typing import Callable, List, Tuple
 from constants import *
+from player import Player
+from typing import List
 from dataclasses import dataclass
 from collections import Counter
+import struct
 import random
 import math
 import pickle
 import pygame
 from pygame import gfxdraw
-from player import PatternLine, Player
 
 
 move_counter = 0

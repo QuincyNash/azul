@@ -1,7 +1,6 @@
 from constants import *
-from collections import Counter
 from pytest_benchmark.fixture import BenchmarkFixture as Benchmark
-from game import Game, Move
+from game import Game
 from search import negascout
 from evaluation import game_evaluation, load_player_eval
 

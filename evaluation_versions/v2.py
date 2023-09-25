@@ -12,5 +12,5 @@ def player_evaluation(points_result: PointsResult) -> float:
 
 
 # Decides how promising a move is
-def move_potential(player_index: int, game: Game, move: Move) -> float:
+def move_potential(move: Move) -> float:
     return move.amount - len(move.floor_tiles)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from constants import *
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List, Union, Callable
+from typing import TYPE_CHECKING, List, Union
 import pygame
 
 

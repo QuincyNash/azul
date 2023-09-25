@@ -1,13 +1,12 @@
 from typing import Callable, TypedDict
 from constants import *
-from game import PointsResult, Game, Move
-from player import Player
+from game import PointsResult, Move
 from importlib import import_module
 
 
 class EvaluationVersion(TypedDict):
     player_evaluation: Callable[[PointsResult], float]
-    move_potential: Callable[[Game, Move], float]
+    move_potential: Callable[[Move], float]
 
 
 def load_player_eval(version: str) -> EvaluationVersion:

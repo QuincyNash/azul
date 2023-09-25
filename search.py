@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Tuple
 from constants import *
 from evaluation import EvaluationVersion, game_evaluation_for_player
 from game import Game, Move
@@ -40,6 +40,8 @@ def get_best_move(
     game: Game,
     turn: int,
     search_time: float,
+    *,
+    show_progress: bool = True,
 ) -> FinalResult:
     total_nodes = 0
     unique_nodes = 0
@@ -66,7 +68,7 @@ def get_best_move(
             d,
             move_order=move_order,
             time_left=time_left,
-            show_progress=True,
+            show_progress=show_progress,
         )
 
         if isinstance(result, FinalResult) and result.move_order != None:
@@ -168,7 +170,8 @@ def negascout(
     else:
         # Use basic evaluation
         all_moves.sort(
-            key=lambda move: player_eval["move_potential"](game, move), reverse=True
+            key=lambda move: player_eval["move_potential"](move),
+            reverse=True,
         )
 
     move_scores: List[Tuple[int, float]] = []

@@ -3,10 +3,7 @@ from typing import Union
 from evaluation import load_player_eval
 from game import Game
 from animation import Animation
-from player import Player
-from search import get_best_move, SearchedNode
-from tqdm import tqdm
-import pickle
+from search import get_best_move
 import time
 
 
