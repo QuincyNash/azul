@@ -9,15 +9,19 @@ class TileImage:
     normal: pygame.Surface
 
 
-COMPUTER_MOVE_TIME = 0.1  # seconds
+COMPUTER_MOVE_TIME = 1  # seconds
+EVALUATION_VERSION = "v2"
+
+
+COMPARE_COMPUTER_MOVE_TIME = 0.01  # seconds
 NUM_COMPARE_ROUNDS = 100
-PLAYER1_COMPARE_VERSION = "v2"
-PLAYER2_COMPARE_VERSION = "v2"
+PLAYER1_COMPARE_VERSION = "v1"
+PLAYER2_COMPARE_VERSION = "v1"
 
 
 FACTORY_COUNT = 5
 NUM_EACH_TILE = 20
-TILE_PER_FACTORY = 4
+TILES_PER_FACTORY = 4
 WALL_SIZE = 5
 NEGATIVE_FLOOR_POINTS = [1, 1, 2, 2, 2]
 HORIZONTAL_LINE_BONUS = 2
@@ -54,6 +58,23 @@ BLACK = "BLACK"
 STAR = "STAR"
 Tile = Literal["BLUE", "YELLOW", "RED", "BLACK", "STAR"]
 TILE_TYPES: list[Tile] = [BLUE, YELLOW, RED, BLACK, STAR]
+
+BYTE_CONVERSION: Dict[Union[Tile, Literal["EMPTY"]], bytes] = {
+    EMPTY: b"\x00",
+    BLUE: b"\x01",
+    YELLOW: b"\x02",
+    RED: b"\x03",
+    BLACK: b"\x04",
+    STAR: b"\x05",
+}
+TILE_NUMBERING: Dict[Union[Tile, Literal["EMPTY"]], int] = {
+    EMPTY: 0,
+    BLUE: 1,
+    YELLOW: 2,
+    RED: 3,
+    BLACK: 4,
+    STAR: 5,
+}
 
 # Stores column position of tile in each row
 TILE_POSITIONS: Dict[Tile, List[int]] = {
