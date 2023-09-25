@@ -16,20 +16,21 @@ if __name__ == "__main__":
     #     game.all_moves(0)
     # print(time.perf_counter() - start)
 
-    game = Game()
+    game = Game(seed=10)
 
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
 
     quit = False
     end = False
-    new_game = game.copy()
     animation: Union[Animation, None] = None
+    new_game = game.copy()
+    serialized_game = game.serialize()
     turn = 0
     player1_wins = 0
     player2_wins = 0
 
-    eval_version = load_player_eval(PLAYER1_COMPARE_VERSION)
+    eval_version = load_player_eval(EVALUATION_VERSION)
 
     game.render()
     pygame.display.update()
@@ -39,19 +40,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 quit = True
 
-        if end:
-            score_difference = game.players[0].points - game.players[1].points
-            if score_difference > 0:
-                player1_wins += 1
-            elif score_difference < 0:
-                player2_wins += 1
-
-            game = Game()
-            end = False
-            turn = 0
-            animation = None
-
-        if animation:
+        if not end and animation:
             if animation.finished:
                 animation = None
 
@@ -61,7 +50,7 @@ if __name__ == "__main__":
 
                     # If the game is over, calcuolate the final score and end the game
                     if game.is_game_over():
-                        game.calculate_points(flag="bonus_only")
+                        game.calculate_points_and_modify(flag="bonus_only")
                         end = True
                     else:
                         turn = game.new_round()
@@ -82,11 +71,11 @@ if __name__ == "__main__":
 
                 animation.update()
 
-        else:
+        elif not end:
             # Start the wall tiling animation
-            if not end and game.is_round_over():
+            if game.is_round_over():
                 new_game = game.copy()
-                new_game.calculate_points()
+                new_game.calculate_points_and_modify()
 
                 animation = Animation(turn, game, None, new_game)
 
@@ -94,14 +83,17 @@ if __name__ == "__main__":
                 pygame.display.update()
 
             # Start the move animation
-            elif not end:
+            else:
                 result = get_best_move(
                     eval_version, eval_version, game, turn, COMPUTER_MOVE_TIME
                 )
 
-                # print(result.score, result.nodes_searched)
+                print(result.score, result.nodes_searched, result.transposition_lookups)
 
-                new_game = game.get_state_after_move(turn, result.move)
+                game.make_move(turn, result.move)
+                new_game = game.copy()
+                game.undo_move(turn, result.move)
+
                 animation = Animation(turn, game, result.move, new_game)
                 turn = (turn + 1) % 2
 
