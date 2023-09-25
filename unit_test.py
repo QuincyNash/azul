@@ -1,5 +1,5 @@
 from constants import *
-from game import Game, Move
+from game import Game, Move, PointChange
 from collections import Counter
 import random
 import pytest
@@ -38,14 +38,22 @@ def test_game_points():
     for x_pos, y_pos in five_of_a_kind_pos + vertical_line_pos + horizontal_line_pos:
         game.players[0].wall[x_pos][y_pos] = True
 
-    game2 = game.copy()
-    game2.calculate_points(flag="normal")
+    og_game = game.copy()
+    og_serialized = game.serialize()
 
-    game3 = game.copy()
+    game2 = og_game.copy()
+    game2.calculate_points(flag="normal", modify_game=True)
+
+    game3 = og_game.copy()
     game3.players[0].wall[2][2] = True
-    game3.calculate_points(flag="bonus_only")
+    game3.calculate_points(flag="bonus_only", modify_game=True)
 
-    game.calculate_points(flag="include_bonus")
+    game = og_game.copy()
+    game.calculate_points(flag="include_bonus", modify_game=True)
+
+    assert og_serialized != game.serialize()
+    assert og_serialized != game2.serialize()
+    assert og_serialized != game3.serialize()
 
     assert (
         game.players[0].points
@@ -56,6 +64,33 @@ def test_game_points():
         game3.players[0].points
         == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
     )
+
+    game2_points = og_game.calculate_points(flag="normal")[0]
+
+    game3 = og_game.copy()
+    game3.players[0].wall[2][2] = True
+    game3_points = game3.calculate_points(flag="bonus_only")[0]
+
+    game_points = og_game.calculate_points(flag="include_bonus")[0]
+
+    assert og_game.serialize() == og_serialized
+
+    assert isinstance(game_points.point_changes[0], PointChange)
+    assert game2_points.bonus_points == 0 and game2_points.negative_floor_points == 0
+    assert (
+        game3_points.bonus_points
+        == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
+        and game3_points.negative_floor_points == 0
+    )
+    assert (
+        game_points.bonus_points
+        == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
+        and game_points.negative_floor_points == 0
+    )
+    assert (
+        sum([point_change.points for point_change in game2_points.point_changes]) == 9
+    )
+    assert sum([point_change.points for point_change in game_points.point_changes]) == 9
 
 
 def test_game_all_moves():
@@ -79,29 +114,28 @@ def test_game_all_moves():
         assert len(moves) == FACTORY_COUNT * (WALL_SIZE + 1)
 
 
-def test_game_get_state_after_move():
+def test_are_no_moves():
     game = Game()
-    game.factories = [
-        Counter({BLUE: 2}),
-        Counter({BLACK: 1}),
-        Counter({RED: 1}),
-        Counter({YELLOW: 1}),
-        Counter({STAR: 1}),
-    ]
-    move = game.all_moves(0)[1]
+    game.factories = [Counter() for _ in range(5)]
+    game.center_pile = Counter()
 
-    game2 = Game()
-    game2.factories = [
-        Counter(),
-        Counter({BLACK: 1}),
-        Counter({RED: 1}),
-        Counter({YELLOW: 1}),
-        Counter({STAR: 1}),
-    ]
-    game2.players[0].pattern_lines[0].tile = BLUE
-    game2.players[0].pattern_lines[0].space = 0
-    game2.players[0].floor = [BLUE]
+    assert game.are_no_moves()
 
-    game = game.get_state_after_move(0, move)
 
-    assert game.serialize() == game2.serialize()
+def test_game_state():
+    game = Game(seed=0)
+    moves = game.all_moves(0)
+
+    game.make_move(0, moves[0])
+
+    original_game = game.serialize()
+    moves = game.all_moves(1)
+
+    for move in moves:
+        print(game)
+
+        game.make_move(0, move)
+        game.undo_move(0, move)
+
+        print(move, game)
+        assert game.serialize() == original_game
