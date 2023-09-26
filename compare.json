@@ -1,0 +1,12 @@
+{
+    "v1,v1": {
+        "player1_wins": 498,
+        "player2_wins": 431,
+        "ties": 73
+    },
+    "v1,v2": {
+        "player1_wins": 5,
+        "player2_wins": 991,
+        "ties": 4
+    }
+}
