@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Literal, List, Dict, Union
 from constants import *
 from evaluation import EvaluationVersion, game_evaluation_for_player
 from game import Game, Move

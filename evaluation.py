@@ -1,4 +1,4 @@
-from typing import Callable, TypedDict
+from typing import Callable, TypedDict, List
 from constants import *
 from game import PointsResult, Move
 from importlib import import_module

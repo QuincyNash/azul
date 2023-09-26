@@ -2,7 +2,7 @@ from __future__ import annotations
 from constants import *
 from graphics import GraphicsInfo
 from player import Player
-from typing import List
+from typing import List, Union, Literal
 from dataclasses import dataclass
 from collections import Counter
 import struct
@@ -81,7 +81,7 @@ class Game:
     def copy(self) -> Game:
         copied_game: Game = pickle.loads(pickle.dumps(self, -1))
 
-        if self.canvas:
+        if hasattr(self, "canvas"):
             # Reinstantiate graphics information, copied versions get corrupted by pygame
             copied_game.canvas = self.canvas
             copied_game.clock = self.clock

@@ -6,27 +6,27 @@ import pytest
 
 
 def test_game_init():
-    game = Game(seed=0)
+    game = Game(graphics_info=None, seed=0)
     assert isinstance(game, Game)
 
 
 def test_game_serialize():
-    game1 = Game(seed=0)
-    game2 = Game(seed=0)
+    game1 = Game(graphics_info=None, seed=0)
+    game2 = Game(graphics_info=None, seed=0)
     random.shuffle(game2.factories)
 
     assert game1.serialize() == game2.serialize()
 
 
 def test_game_copy():
-    game = Game(seed=0)
+    game = Game(graphics_info=None, seed=0)
     game_copy = game.copy()
 
     assert game.serialize() == game_copy.serialize()
 
 
 def test_game_points():
-    game = Game(seed=0)
+    game = Game(graphics_info=None, seed=0)
 
     game.players[0].pattern_lines[2].tile = BLUE
     game.players[0].pattern_lines[2].space = 0
@@ -94,7 +94,7 @@ def test_game_points():
 
 
 def test_game_all_moves():
-    game = Game()
+    game = Game(graphics_info=None, seed=0)
     game.factories = [
         Counter({BLUE: 1}),
         Counter({BLACK: 1}),
@@ -115,7 +115,7 @@ def test_game_all_moves():
 
 
 def test_are_no_moves():
-    game = Game()
+    game = Game(graphics_info=None, seed=0)
     game.factories = [Counter() for _ in range(5)]
     game.center_pile = Counter()
 
@@ -123,7 +123,7 @@ def test_are_no_moves():
 
 
 def test_game_state():
-    game = Game(seed=0)
+    game = Game(graphics_info=None, seed=0)
     moves = game.all_moves(0)
 
     game.make_move(0, moves[0])
@@ -132,10 +132,7 @@ def test_game_state():
     moves = game.all_moves(1)
 
     for move in moves:
-        print(game)
-
         game.make_move(0, move)
         game.undo_move(0, move)
 
-        print(move, game)
         assert game.serialize() == original_game

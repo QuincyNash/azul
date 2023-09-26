@@ -1,5 +1,5 @@
 from constants import *
-from typing import NamedTuple
+from typing import NamedTuple, Union, Literal, Dict
 from dataclasses import dataclass
 import pygame
 

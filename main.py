@@ -16,7 +16,7 @@ if __name__ == "__main__":
     # print(time.perf_counter() - start)
 
     graphics_info = graphics.init()
-    game = Game(graphics_info=None, seed=10)
+    game = Game(graphics_info=graphics_info, seed=10)
 
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
