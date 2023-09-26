@@ -3,8 +3,10 @@ from typing import Union
 from evaluation import load_player_eval
 from game import Game
 from animation import Animation
+import graphics
 from search import get_best_move
 import time
+import pygame
 
 
 if __name__ == "__main__":
@@ -13,7 +15,8 @@ if __name__ == "__main__":
     #     game.all_moves(0)
     # print(time.perf_counter() - start)
 
-    game = Game(seed=10)
+    graphics_info = graphics.init()
+    game = Game(graphics_info=None, seed=10)
 
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
@@ -74,7 +77,7 @@ if __name__ == "__main__":
                 new_game = game.copy()
                 new_game.calculate_points_and_modify()
 
-                animation = Animation(turn, game, None, new_game)
+                animation = Animation(turn, game, None, new_game, graphics_info)
 
                 game.render()
                 pygame.display.update()
@@ -91,10 +94,10 @@ if __name__ == "__main__":
                 new_game = game.copy()
                 game.undo_move(turn, result.move)
 
-                animation = Animation(turn, game, result.move, new_game)
+                animation = Animation(turn, game, result.move, new_game, graphics_info)
                 turn = (turn + 1) % 2
 
             game.render()
             pygame.display.update()
 
-        clock.tick(FRAME_RATE)
+        graphics_info.clock.tick(FRAME_RATE)

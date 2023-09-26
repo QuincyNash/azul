@@ -1,5 +1,6 @@
 from __future__ import annotations
 from constants import *
+from graphics import GraphicsInfo
 from player import Player
 from typing import List
 from dataclasses import dataclass
@@ -48,9 +49,19 @@ class PointsResult:
 
 
 class Game:
-    def __init__(self, *, seed=None) -> None:
+    def __init__(self, graphics_info: Union[GraphicsInfo, None], *, seed=None) -> None:
         if seed is not None:
             random.seed(seed)
+
+        # Unpack graphics variables
+        if graphics_info:
+            (
+                self.canvas,
+                self.clock,
+                self.floor_font,
+                self.main_font,
+                self.images,
+            ) = graphics_info
 
         # Counters are used for factories to store the number of occurences of each tile
         # Create factories and populate each with 4 random tiles
@@ -60,12 +71,32 @@ class Game:
         self.center_pile: Factory = Counter()
         self.center_pile[STARTING_MARKER] = 1
 
-        self.players = [Player(index=0), Player(index=1)]
+        self.players = [
+            Player(index=0, graphics_info=graphics_info),
+            Player(index=1, graphics_info=graphics_info),
+        ]
 
         self.new_round()
 
     def copy(self) -> Game:
-        return pickle.loads(pickle.dumps(self, -1))
+        copied_game: Game = pickle.loads(pickle.dumps(self, -1))
+
+        if self.canvas:
+            # Reinstantiate graphics information, copied versions get corrupted by pygame
+            copied_game.canvas = self.canvas
+            copied_game.clock = self.clock
+            copied_game.floor_font = self.floor_font
+            copied_game.main_font = self.main_font
+            copied_game.images = self.images
+
+            for player in copied_game.players:
+                player.canvas = self.canvas
+                player.clock = self.clock
+                player.floor_font = self.floor_font
+                player.main_font = self.main_font
+                player.images = self.images
+
+        return copied_game
 
     def random_tile(self) -> Tile:
         return random.choice(TILE_TYPES)
@@ -499,21 +530,21 @@ class Game:
 
                 for position in positions:
                     canvas.blit(
-                        IMAGES[tile].normal,
+                        self.images[tile].normal,
                         (position.x, position.y),
                     )
 
     def render(
         self, *, player1_wins=-1, player2_wins=-1, ties=-1, no_tiles_but_wall=False
     ) -> None:
-        canvas.fill(COLOR_WHITE)
+        self.canvas.fill(COLOR_WHITE)
 
         # Line Borders
         pygame.draw.aaline(
-            canvas, COLOR_BLACK, (PLAYER_WIDTH, 0), (PLAYER_WIDTH, TOTAL_HEIGHT)
+            self.canvas, COLOR_BLACK, (PLAYER_WIDTH, 0), (PLAYER_WIDTH, TOTAL_HEIGHT)
         )
         pygame.draw.aaline(
-            canvas, COLOR_BLACK, (0, PLAYER_HEIGHT), (PLAYER_WIDTH, PLAYER_HEIGHT)
+            self.canvas, COLOR_BLACK, (0, PLAYER_HEIGHT), (PLAYER_WIDTH, PLAYER_HEIGHT)
         )
 
         # Player display
@@ -523,7 +554,7 @@ class Game:
             wins = player1_wins if player_index == 0 else player2_wins
 
             player.render(
-                canvas,
+                self.canvas,
                 w_transform,
                 h_transform,
                 no_tiles_but_wall=no_tiles_but_wall,
@@ -536,7 +567,7 @@ class Game:
 
             self.render_factory(
                 index,
-                canvas,
+                self.canvas,
                 int(pos.x),
                 int(pos.y),
                 no_tiles=no_tiles_but_wall,
@@ -554,18 +585,18 @@ class Game:
                 positions = self.get_rendering_positions(tile_type, center_pile=True)
 
                 for position in positions:
-                    canvas.blit(
-                        IMAGES[tile_type].normal,
+                    self.canvas.blit(
+                        self.images[tile_type].normal,
                         (position.x, position.y),
                     )
 
         # Ties
         if ties != -1:
-            text = MAIN_FONT.render(f"Ties: {ties}", True, COLOR_BLACK)
+            text = self.main_font.render(f"Ties: {ties}", True, COLOR_BLACK)
             text_rect = text.get_rect(
                 center=(
                     PLAYER_WIDTH + CENTER_SIZE / 2,
                     CENTER_SIZE - SCORE_HEIGHT / 2,
                 )
             )
-            canvas.blit(text, text_rect)
+            self.canvas.blit(text, text_rect)

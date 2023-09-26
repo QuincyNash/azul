@@ -6,7 +6,7 @@ import pygame
 
 
 if TYPE_CHECKING:
-    from game import Game, TileImage
+    from graphics import GraphicsInfo, ImageFileName
 
 
 @dataclass(slots=True)
@@ -19,7 +19,17 @@ class PatternLine:
 
 
 class Player:
-    def __init__(self, index: int) -> None:
+    def __init__(self, index: int, graphics_info: Union[GraphicsInfo, None]) -> None:
+        # Unpack graphics variables
+        if graphics_info:
+            (
+                self.canvas,
+                self.clock,
+                self.floor_font,
+                self.main_font,
+                self.images,
+            ) = graphics_info
+
         # Index of player in Game.players list
         self.index = index
 
@@ -127,7 +137,7 @@ class Player:
             )
             if tile != EMPTY and (not no_tiles_but_wall or force_tiles):
                 canvas.blit(
-                    IMAGES[tile].faded if faded else IMAGES[tile].normal,
+                    self.images[tile].faded if faded else self.images[tile].normal,
                     (x_pos, y_pos),
                 )
 
@@ -189,7 +199,7 @@ class Player:
 
             number = NEGATIVE_FLOOR_POINTS[x] if x < len(NEGATIVE_FLOOR_POINTS) else 3
 
-            text = FLOOR_FONT.render(f"-{number}", True, BLACK)
+            text = self.floor_font.render(f"-{number}", True, BLACK)
             text_rect = text.get_rect(
                 center=(
                     w_transform + x_pos + TILE_SIZE / 2,
@@ -199,7 +209,7 @@ class Player:
             canvas.blit(text, text_rect)
 
         # Score
-        text = MAIN_FONT.render(f"Score: {self.points}", True, BLACK)
+        text = self.main_font.render(f"Score: {self.points}", True, BLACK)
         if wins == -1:
             text_rect = text.get_rect(
                 center=(
@@ -218,7 +228,7 @@ class Player:
 
         # Wins
         if wins != -1:
-            text = MAIN_FONT.render(f"Wins: {wins}", True, BLACK)
+            text = self.main_font.render(f"Wins: {wins}", True, BLACK)
             text_rect = text.get_rect(
                 midleft=(
                     SECTION_SPACING,

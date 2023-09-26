@@ -1,8 +1,11 @@
 from __future__ import annotations
 from constants import *
 from typing import TYPE_CHECKING, Union, Literal
+import pygame
+
 
 if TYPE_CHECKING:
+    from graphics import GraphicsInfo
     from game import Game, Move
 
 
@@ -21,8 +24,23 @@ class AnimatingTile:
 
 class Animation:
     def __init__(
-        self, player_index: int, old_game: Game, move: Union[Move, None], new_game: Game
+        self,
+        player_index: int,
+        old_game: Game,
+        move: Union[Move, None],
+        new_game: Game,
+        graphics_info: GraphicsInfo,
     ) -> None:
+        # Unpack graphics variables
+        if graphics_info:
+            (
+                self.canvas,
+                self.clock,
+                self.floor_font,
+                self.main_font,
+                self.images,
+            ) = graphics_info
+
         self.old_game = old_game
         self.move = move
         self.player_index = player_index
@@ -232,7 +250,7 @@ class Animation:
 
     def render(self):
         for tile in self.tiles:
-            canvas.blit(
-                IMAGES[tile.tile].normal,
+            self.canvas.blit(
+                self.images[tile.tile].normal,
                 (tile.position.x, tile.position.y),
             )

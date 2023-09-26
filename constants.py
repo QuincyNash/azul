@@ -1,12 +1,5 @@
 from dataclasses import dataclass
 from typing import Literal, List, Dict, Union
-import pygame
-
-
-@dataclass
-class TileImage:
-    faded: pygame.Surface
-    normal: pygame.Surface
 
 
 COMPUTER_MOVE_TIME = 1  # seconds
@@ -14,9 +7,9 @@ EVALUATION_VERSION = "v2"
 
 
 COMPARE_COMPUTER_MOVE_TIME = 0.1  # seconds
-NUM_COMPARE_ROUNDS = 100
-PLAYER1_COMPARE_VERSION = "v2"
-PLAYER2_COMPARE_VERSION = "v2"
+NUM_COMPARE_ROUNDS = 1000
+PLAYER1_COMPARE_VERSION = 1
+PLAYER2_COMPARE_VERSION = 2
 
 
 FACTORY_COUNT = 5
@@ -114,27 +107,3 @@ PLAYER_HEIGHT = (
 CENTER_SIZE = 2 * PLAYER_HEIGHT
 TOTAL_WIDTH = PLAYER_WIDTH + CENTER_SIZE
 TOTAL_HEIGHT = 2 * PLAYER_HEIGHT
-
-pygame.init()
-canvas = pygame.display.set_mode((TOTAL_WIDTH, TOTAL_HEIGHT))
-clock = pygame.time.Clock()
-
-FLOOR_FONT = pygame.font.Font(f"assets/fonts/{FONT_FILE_NAME}.ttf", FLOOR_FONT_SIZE)
-MAIN_FONT = pygame.font.Font(f"assets/fonts/{FONT_FILE_NAME}.ttf", MAIN_FONT_SIZE)
-
-# Load and scale images (faded and normal)
-ImageFileName = Union[Tile, Literal["STARTING_MARKER"]]
-IMAGES: Dict[ImageFileName, TileImage] = {}
-file_names: List[ImageFileName] = [
-    *TILE_TYPES,
-    STARTING_MARKER,
-]
-
-for _tile in file_names:
-    _image = pygame.image.load(f"assets/images/{_tile}.png")
-
-    _image = pygame.transform.smoothscale(_image, (TILE_SIZE, TILE_SIZE))
-    _faded_image = pygame.transform.smoothscale(_image, (TILE_SIZE, TILE_SIZE))
-    _faded_image.set_alpha(65)
-
-    IMAGES[_tile] = TileImage(faded=_faded_image, normal=_image)
