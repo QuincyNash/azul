@@ -18,7 +18,7 @@ serialize_counter = 0
 points_counter = 0
 make_move_counter = 0
 no_move_counter = 0
-Factory = Counter[Union[Tile, Literal["STARTING_MARKER"]]]
+Factory = Counter[Union[Tile, Literal[6]]]
 
 
 @dataclass(slots=True)
@@ -436,7 +436,7 @@ class Game:
     # Used for piece animation
     def get_rendering_positions(
         self,
-        tile: Union[Tile, Literal["STARTING_MARKER"]],
+        tile: Union[Tile, Literal[6]],
         *,
         center_pile: bool = False,
         factory_index: int = -1,
@@ -467,8 +467,8 @@ class Game:
                     )
 
         elif center_pile:
-            tiles: List[Union[Tile, Literal["STARTING_MARKER"]]] = []
-            types: List[Union[Tile, Literal["STARTING_MARKER"]]] = [
+            tiles: List[Union[Tile, Literal[6]]] = []
+            types: List[Union[Tile, Literal[6]]] = [
                 STARTING_MARKER,
                 *TILE_TYPES,
             ]
@@ -576,7 +576,7 @@ class Game:
         # Center pile
         # Create actual tiles, not the counter
         if not no_tiles_but_wall:
-            types: List[Union[Tile, Literal["STARTING_MARKER"]]] = [
+            types: List[Union[Tile, Literal[6]]] = [
                 STARTING_MARKER,
                 *TILE_TYPES,
             ]

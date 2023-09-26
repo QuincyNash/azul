@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 # Stores the data about a tile that is being animated
 @dataclass
 class AnimatingTile:
-    tile: Union[Tile, Literal["STARTING_MARKER"]]
+    tile: Union[Tile, Literal[6]]
     position: pygame.math.Vector2
     new_position: pygame.math.Vector2
 
@@ -197,7 +197,7 @@ class Animation:
     def render_all_other_tiles(
         self,
     ):
-        types: List[Union[Tile, Literal["STARTING_MARKER"]]] = [
+        types: List[Union[Tile, Literal[6]]] = [
             STARTING_MARKER,
             *TILE_TYPES,
         ]

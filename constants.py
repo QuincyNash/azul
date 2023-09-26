@@ -41,17 +41,17 @@ FLOOR_FONT_SIZE = 16
 MAIN_FONT_SIZE = 25
 
 
-STARTING_MARKER = "STARTING_MARKER"
-EMPTY = "EMPTY"
-BLUE = "BLUE"
-YELLOW = "YELLOW"
-RED = "RED"
-BLACK = "BLACK"
-STAR = "STAR"
-Tile = Literal["BLUE", "YELLOW", "RED", "BLACK", "STAR"]
+STARTING_MARKER = 6
+EMPTY = 0
+BLUE = 1
+YELLOW = 2
+RED = 3
+BLACK = 4
+STAR = 5
+Tile = Literal[0, 1, 2, 3, 4, 5]
 TILE_TYPES: list[Tile] = [BLUE, YELLOW, RED, BLACK, STAR]
 
-BYTE_CONVERSION: Dict[Union[Tile, Literal["EMPTY"]], bytes] = {
+BYTE_CONVERSION: Dict[Union[Tile, Literal[0]], bytes] = {
     EMPTY: b"\x00",
     BLUE: b"\x01",
     YELLOW: b"\x02",
@@ -59,7 +59,7 @@ BYTE_CONVERSION: Dict[Union[Tile, Literal["EMPTY"]], bytes] = {
     BLACK: b"\x04",
     STAR: b"\x05",
 }
-TILE_NUMBERING: Dict[Union[Tile, Literal["EMPTY"]], int] = {
+TILE_NUMBERING: Dict[Union[Tile, Literal[0]], int] = {
     EMPTY: 0,
     BLUE: 1,
     YELLOW: 2,

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class PatternLine:
-    tile: Union[Tile, Literal["EMPTY"]]
+    tile: Union[Tile, Literal[0]]
     space: int
 
     def __bytes__(self) -> bytes:
@@ -45,7 +45,7 @@ class Player:
         self.wall = [[False for _ in range(WALL_SIZE)] for _ in range(WALL_SIZE)]
 
         # Tiles that are not placed in a pattern line
-        self.floor: List[Union[Tile, Literal["STARTING_MARKER"]]] = []
+        self.floor: List[Union[Tile, Literal[6]]] = []
 
     # Printable version of Player
     def __str__(self) -> str:
@@ -54,7 +54,7 @@ class Player:
     # Return the possible positions for a tile of a given type
     def get_rendering_positions(
         self,
-        tile: Union[Tile, Literal["STARTING_MARKER"]],
+        tile: Union[Tile, Literal[6]],
         type: Literal["wall", "pattern_line", "floor"],
         line_index: int = 0,
     ) -> List[pygame.math.Vector2]:
@@ -119,7 +119,7 @@ class Player:
         def draw_tile_and_border(
             x_pos: float,
             y_pos: float,
-            tile: Union[ImageFileName, Literal["EMPTY"]],
+            tile: Union[ImageFileName, Literal[0]],
             *,
             faded: bool = True,
             force_tiles: bool = False,
@@ -142,7 +142,7 @@ class Player:
                 )
 
         # Floor and pattern line tiles
-        types: List[Union[Tile, Literal["STARTING_MARKER"]]] = [
+        types: List[Union[Tile, Literal[6]]] = [
             *TILE_TYPES,
             STARTING_MARKER,
         ]

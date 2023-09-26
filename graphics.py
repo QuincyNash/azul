@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import pygame
 
 
-ImageFileName = Union[Tile, Literal["STARTING_MARKER"]]
+ImageFileName = Union[Tile, Literal[6]]
 
 
 @dataclass
@@ -37,8 +37,17 @@ def init() -> GraphicsInfo:
         STARTING_MARKER,
     ]
 
+    tile_names: Dict[ImageFileName, str] = {
+        BLUE: "BLUE",
+        YELLOW: "YELLOW",
+        RED: "RED",
+        BLACK: "BLACK",
+        STAR: "STAR",
+        STARTING_MARKER: "STARTING_MARKER",
+    }
+
     for tile in file_names:
-        image = pygame.image.load(f"assets/images/{tile}.png")
+        image = pygame.image.load(f"assets/images/{tile_names[tile]}.png")
 
         image = pygame.transform.smoothscale(image, (TILE_SIZE, TILE_SIZE))
         faded_image = pygame.transform.smoothscale(image, (TILE_SIZE, TILE_SIZE))
