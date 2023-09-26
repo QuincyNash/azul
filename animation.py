@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from constants import *
 from typing import TYPE_CHECKING, Union, Literal
 import pygame

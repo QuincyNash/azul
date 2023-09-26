@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Literal, List, Dict, Union
 
 
@@ -107,3 +106,6 @@ PLAYER_HEIGHT = (
 CENTER_SIZE = 2 * PLAYER_HEIGHT
 TOTAL_WIDTH = PLAYER_WIDTH + CENTER_SIZE
 TOTAL_HEIGHT = 2 * PLAYER_HEIGHT
+
+# Cleanup global variables
+del Literal, List, Dict, Union
