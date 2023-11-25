@@ -1,11 +1,13 @@
-from game import Game, Move, PointsResult
-from player import Player
+from game import Move, PointsResult
 
 
 # Evaluates a players position
 def player_evaluation(points_result: PointsResult) -> float:
     return (
-        sum(change.points for change in points_result.point_changes)
+        sum(
+            (change.points if change.completed else 0)
+            for change in points_result.point_changes
+        )
         - points_result.negative_floor_points
         + points_result.bonus_points
     )
