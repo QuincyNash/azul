@@ -1,8 +1,10 @@
 from __future__ import annotations
+
+
 from constants import *
 from graphics import GraphicsInfo
-from player import Player
-from typing import List, Union, Literal
+from player import Player, PatternLine
+from typing import List, Tuple, Union, Literal
 from dataclasses import dataclass
 from collections import Counter
 import struct
@@ -22,16 +24,20 @@ Factory = Counter[Union[Tile, Literal[6]]]
 
 
 @dataclass(slots=True)
-class Move:
+class PartialMove:
     drawing: Tile
     amount: int
     moving_to_center: Factory
     player_index: int  # Index of player in Game.players list
-    factory_index: int  # Index of factory in Game.factories list
-    pattern_line: int
-    floor_tiles: List[Tile]
+    factory_index: int  # Index of factory in Game.factories list, if center pile, then index is -1
     is_center_draw: bool
     first_draw_from_center: bool
+
+
+@dataclass(slots=True)
+class Move(PartialMove):
+    pattern_line: int
+    floor_tiles: List[Tile]
 
 
 @dataclass(slots=True)
@@ -39,6 +45,8 @@ class PointChange:
     pattern_line: int
     tile: Tile
     points: int
+    space_left: int
+    completed: bool
 
 
 @dataclass(slots=True)
@@ -113,6 +121,70 @@ class Game:
             ),
         )
 
+    def factory_to_readable_factory(self, factory: Factory) -> Dict[str, int]:
+        result: Dict[str, int] = {}
+
+        for tile, count in factory.items():
+            result[TILE_NAMES[tile]] = count
+
+        return result
+
+    def readable_factory_to_factory(self, readable_factory: Dict[str, int]) -> Factory:
+        result: Factory = Counter()
+
+        for tile, count in readable_factory.items():
+            # Tiles in factory cannot be empty
+            result[TILE_NUMBERS[tile]] = count  # type: ignore
+
+        return result
+
+    def to_json(self, current_turn: Literal[0, 1]) -> dict:
+        result: dict = {}
+
+        for index, player in enumerate(self.players):
+            result[f"player{index + 1}"] = {
+                "pattern_lines": [
+                    {"tile": TILE_NAMES[line.tile], "space": line.space}
+                    for line in player.pattern_lines
+                ],
+                "wall": [
+                    ["FULL" if filled else "EMPTY" for filled in row]
+                    for row in player.wall
+                ],
+                "floor": list(map(TILE_NAMES.get, player.floor)),
+                "points": player.points,
+                "has_starting_marker": player.has_starting_marker,
+            }
+
+        result["factories"] = list(
+            map(self.factory_to_readable_factory, self.factories)
+        )
+        result["center_pile"] = self.factory_to_readable_factory(self.center_pile)
+        result["turn"] = current_turn + 1
+
+        return result
+
+    def from_json(self, json: dict) -> None:
+        for index, player_json in enumerate([json["player1"], json["player2"]]):
+            player = self.players[index]
+
+            # If the user tries to load an invalid json file, an error will be thrown
+            player.pattern_lines = [
+                PatternLine(tile=TILE_NUMBERS[line["tile"]], space=line["space"])  # type: ignore
+                for line in player_json["pattern_lines"]
+            ]
+            player.wall = [
+                [True if filled == "FULL" else False for filled in row]
+                for row in player_json["wall"]
+            ]
+            player.floor = list(map(TILE_NUMBERS.get, player_json["floor"]))  # type: ignore
+
+            player.points = player_json["points"]
+            player.has_starting_marker = player_json["has_starting_marker"]
+
+        self.factories = list(map(self.readable_factory_to_factory, json["factories"]))
+        self.center_pile = self.readable_factory_to_factory(json["center_pile"])
+
     def serialize(self) -> bytes:
         result: bytes = b""
 
@@ -149,7 +221,7 @@ class Game:
         return False
 
     # Reset all factories and the starting marker
-    def new_round(self) -> int:
+    def new_round(self) -> Literal[0, 1]:
         for factory in self.factories:
             tiles = [self.random_tile() for _ in range(TILES_PER_FACTORY)]
             for tile in TILE_TYPES:
@@ -229,6 +301,52 @@ class Game:
             factory[move.drawing] += move.amount
             factory.update(move.moving_to_center)
 
+    def calculate_potential_points(
+        self, wall: List[List[bool]], tile: Tile, row_index: int
+    ) -> int:
+        column_index = TILE_POSITIONS[tile][row_index]
+        potential_points = 1  # Count the tile that was placed
+
+        # Count all placed tiles in each row and column
+        for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            # Continue counting while tiles are filled and exist
+            xpos, ypos = column_index + xdir, row_index + ydir
+            while 0 <= xpos < WALL_SIZE and 0 <= ypos < WALL_SIZE and wall[ypos][xpos]:
+                potential_points += 1
+                xpos += xdir
+                ypos += ydir
+
+        return potential_points
+
+    def calculate_bonus_points(self, wall: List[List[bool]]) -> int:
+        bonus_points = 0
+
+        for row in wall:
+            if all(row):
+                bonus_points += HORIZONTAL_LINE_BONUS
+
+        for column in zip(*wall):
+            if all(column):
+                bonus_points += VERTICAL_LINE_BONUS
+
+        for tile in TILE_TYPES:
+            if all(wall[row][TILE_POSITIONS[tile][row]] for row in range(WALL_SIZE)):
+                bonus_points += FIVE_OF_A_KIND_BONUS
+
+        return bonus_points
+
+    def calculate_negative_floor_points(
+        self, floor: List[Union[Tile, Literal[6]]]
+    ) -> int:
+        floor_negative_points = 0
+
+        # Starting floor points are stored in NEGATIVE_FLOOR_POINTS, the rest count as MAX_NEGATIVE_FLOOR_POINTS
+        leftover = max(len(floor) - len(NEGATIVE_FLOOR_POINTS), 0)
+        floor_negative_points += sum(NEGATIVE_FLOOR_POINTS[: len(floor)])
+        floor_negative_points += MAX_NEGATIVE_FLOOR_POINTS * leftover
+
+        return floor_negative_points
+
     def calculate_points_and_modify(
         self, *, flag: Literal["bonus_only", "include_bonus", "normal"] = "normal"
     ) -> None:
@@ -246,6 +364,7 @@ class Game:
             total_positive_points = 0
             bonus_points = 0
             floor_negative_points = 0
+            old_player_points = player.points
             point_changes: List[PointChange] = []
 
             # For every line, if it is full, move a tile to the wall
@@ -257,62 +376,48 @@ class Game:
                     if line.space == 0 and line.tile != EMPTY:
                         column_index = TILE_POSITIONS[line.tile][row_index]
 
-                        # Add tile to wall
-                        # Even if not modified, if modified, remove later
+                        # Add tile to wall even if not modified, if modified, remove later
                         wall[row_index][column_index] = True
 
+                        potential_points = self.calculate_potential_points(
+                            wall, line.tile, row_index
+                        )
+                        total_positive_points += potential_points
+
                         if modify_game:
+                            player.points += potential_points
                             # Remove tiles from pattern line
                             pattern_lines[row_index].space = row_index + 1
                             pattern_lines[row_index].tile = EMPTY
-
-                        tile_points = 0
-
-                        # Count the points by the number of adjacent tiles in each direction
-                        for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                            # Continue counting while tiles are filled
-                            xpos, ypos = column_index + xdir, row_index + ydir
-                            while (
-                                0 <= xpos < WALL_SIZE
-                                and 0 <= ypos < WALL_SIZE
-                                and wall[ypos][xpos]
-                            ):
-                                if modify_game:
-                                    player.points += 1
-                                tile_points += 1
-                                total_positive_points += 1
-
-                                xpos += xdir
-                                ypos += ydir
-
-                        total_positive_points += 1
-
-                        if modify_game:
-                            # Make sure to count the tile that was placed
-                            player.points += 1
                         else:
                             point_changes.append(
-                                # Make sure to count the tile that was placed (+1)
-                                PointChange(row_index, line.tile, tile_points + 1)
+                                PointChange(
+                                    row_index,
+                                    line.tile,
+                                    potential_points,
+                                    space_left=0,
+                                    completed=True,
+                                )
                             )
+
+                    # Pattern line is not full but contains some tiles, so calculate the potential points once the row is complete
+                    elif line.tile != EMPTY and not modify_game:
+                        potential_points = self.calculate_potential_points(
+                            wall, line.tile, row_index
+                        )
+                        point_changes.append(
+                            PointChange(
+                                row_index,
+                                line.tile,
+                                potential_points,
+                                space_left=line.space,
+                                completed=False,
+                            )
+                        )
 
             # Calculate bonus points
             if flag in ["include_bonus", "bonus_only"]:
-                for row in player.wall:
-                    if all(row):
-                        bonus_points += HORIZONTAL_LINE_BONUS
-
-                for column in zip(*player.wall):
-                    if all(column):
-                        bonus_points += VERTICAL_LINE_BONUS
-
-                for tile in TILE_TYPES:
-                    if all(
-                        player.wall[row][TILE_POSITIONS[tile][row]]
-                        for row in range(WALL_SIZE)
-                    ):
-                        bonus_points += FIVE_OF_A_KIND_BONUS
-
+                bonus_points = self.calculate_bonus_points(player.wall)
                 total_positive_points += bonus_points
 
                 if modify_game:
@@ -325,15 +430,11 @@ class Game:
                 ] = False
 
             if flag != "bonus_only":
-                # Make sure to subtract the floor points
-                # Leftover floor points count as -3
-                leftover = max(len(player.floor) - len(NEGATIVE_FLOOR_POINTS), 0)
-                floor_negative_points += sum(NEGATIVE_FLOOR_POINTS[: len(player.floor)])
-                floor_negative_points += 3 * leftover
-
                 # Points can't go below 0
                 floor_negative_points = min(
-                    floor_negative_points, total_positive_points
+                    self.calculate_negative_floor_points(player.floor),
+                    total_positive_points
+                    + old_player_points,  # Negative points cannot go below the previous points of the player added to the new positive points
                 )
 
                 if modify_game:
@@ -380,7 +481,7 @@ class Game:
                             drawing=tile,
                             amount=0,
                             moving_to_center=factory_copy,
-                            pattern_line=0,
+                            pattern_line=-1,
                             floor_tiles=[tile] * factory[tile],
                             player_index=player_index,
                             factory_index=index - 1,
@@ -506,6 +607,28 @@ class Game:
 
         return positions
 
+    def render_tile(
+        self,
+        tile: Union[Tile, Literal[6]],
+        position: pygame.math.Vector2,
+        *,
+        faded=False,
+    ):
+        if faded:
+            self.canvas.blit(self.images[tile].faded, (position.x, position.y))
+        else:
+            self.canvas.blit(self.images[tile].normal, (position.x, position.y))
+
+    def render_tile_outline(
+        self, position: pygame.math.Vector2, color: Tuple[int, int, int], alpha: int
+    ) -> None:
+        surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+        alpha_color = color + (alpha,)
+
+        pygame.draw.rect(surface, alpha_color, (0, 0, TILE_SIZE, TILE_SIZE), 2)
+
+        self.canvas.blit(surface, (position.x, position.y))
+
     def render_factory(
         self,
         factory_index: int,
@@ -514,6 +637,9 @@ class Game:
         h_transform: int,
         *,
         no_tiles: bool = False,
+        player_choice: Literal["tile", "line", None] = None,
+        highlighted_tile: Union[Tile, None] = None,
+        is_tile_hovered: bool = False,
     ) -> None:
         gfxdraw.aacircle(
             canvas,
@@ -522,6 +648,7 @@ class Game:
             FACTORY_RADIUS,
             COLOR_BLACK,
         )
+
         if not no_tiles:
             for tile in TILE_TYPES:
                 positions = self.get_rendering_positions(
@@ -529,15 +656,120 @@ class Game:
                 )
 
                 for position in positions:
-                    canvas.blit(
-                        self.images[tile].normal,
-                        (position.x, position.y),
+                    self.render_tile(
+                        tile,
+                        position,
+                        faded=is_tile_hovered and highlighted_tile != tile,
                     )
 
+                    if player_choice is not None:
+                        color = COLOR_RED if player_choice == "tile" else COLOR_GRAY
+
+                        alpha = (
+                            FADED_IMAGE_ALPHA
+                            if is_tile_hovered and highlighted_tile != tile
+                            else 255
+                        )
+                        self.render_tile_outline(position, color, alpha)
+
+    def get_hovered_partial_move(self) -> Union[PartialMove, None]:
+        mouse = pygame.Vector2(pygame.mouse.get_pos())
+        hover_tile: Union[Tile, None] = None
+        hover_factory: Union[int, None] = None
+
+        for factory_index in [*range(FACTORY_COUNT), -1]:
+            for tile in TILE_TYPES:
+                if factory_index == -1:
+                    positions = self.get_rendering_positions(tile, center_pile=True)
+                else:
+                    positions = self.get_rendering_positions(
+                        tile, factory_index=factory_index
+                    )
+                for position in positions:
+                    if (
+                        position.x <= mouse.x <= position.x + TILE_SIZE
+                        and position.y <= mouse.y <= position.y + TILE_SIZE
+                    ):
+                        hover_tile = tile
+                        hover_factory = factory_index
+
+        if hover_factory is None or hover_tile is None:
+            return None
+
+        if hover_factory == -1:
+            return PartialMove(
+                drawing=hover_tile,
+                amount=self.center_pile[hover_tile],
+                moving_to_center=Counter(),
+                player_index=0,
+                factory_index=hover_factory,
+                is_center_draw=True,
+                first_draw_from_center=self.center_pile[STARTING_MARKER] == 1,
+            )
+        else:
+            modified_factory = self.factories[hover_factory].copy()
+            modified_factory[hover_tile] = 0
+
+            return PartialMove(
+                drawing=hover_tile,
+                amount=self.factories[hover_factory][hover_tile],
+                moving_to_center=modified_factory,
+                player_index=0,
+                factory_index=hover_factory,
+                is_center_draw=False,
+                first_draw_from_center=False,
+            )
+
+    def get_hovered_move(self, partial_move: PartialMove) -> Union[Move, None]:
+        pattern_line = self.players[0].hovered_pattern_line
+
+        if pattern_line is None:
+            return None
+
+        if pattern_line == -1:
+            amount = 0
+            floor_amount = partial_move.amount
+        else:
+            amount = min(
+                self.players[0].pattern_lines[pattern_line].space, partial_move.amount
+            )
+            floor_amount = partial_move.amount - amount
+
+        return Move(
+            drawing=partial_move.drawing,
+            amount=amount,
+            moving_to_center=partial_move.moving_to_center,
+            player_index=0,
+            factory_index=partial_move.factory_index,
+            pattern_line=pattern_line,
+            floor_tiles=[partial_move.drawing] * floor_amount,
+            is_center_draw=partial_move.is_center_draw,
+            first_draw_from_center=partial_move.first_draw_from_center,
+        )
+
     def render(
-        self, *, player1_wins=-1, player2_wins=-1, ties=-1, no_tiles_but_wall=False
+        self,
+        *,
+        player1_wins=-1,
+        player2_wins=-1,
+        ties=-1,
+        no_tiles_but_wall=False,
+        player_choice: Literal["tile", "line", None] = None,
+        partial_tile_move: Union[PartialMove, None] = None,
     ) -> None:
         self.canvas.fill(COLOR_WHITE)
+
+        if player_choice is not None and partial_tile_move is None:
+            partial_move = self.get_hovered_partial_move()
+
+            if partial_move is None:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            else:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+
+        else:
+            partial_move = partial_tile_move
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
         # Line Borders
         pygame.draw.aaline(
@@ -549,7 +781,7 @@ class Game:
 
         # Player display
         for player_index, player in enumerate(self.players):
-            w_transform = TILE_BORDER + SECTION_SPACING
+            w_transform = 1 + SECTION_SPACING
             h_transform = PLAYER_HEIGHT if player_index == 1 else 0
             wins = player1_wins if player_index == 0 else player2_wins
 
@@ -559,11 +791,17 @@ class Game:
                 h_transform,
                 no_tiles_but_wall=no_tiles_but_wall,
                 wins=wins,
+                highlight_lines=player_choice == "line",
+                partial_move=partial_tile_move,
             )
 
-        # Center display
+        # Factory Display
         for index in range(len(self.factories)):
             pos = self.factory_position(index)
+
+            highlighted_tile = None
+            if partial_move and partial_move.factory_index == index:
+                highlighted_tile = partial_move.drawing
 
             self.render_factory(
                 index,
@@ -571,6 +809,9 @@ class Game:
                 int(pos.x),
                 int(pos.y),
                 no_tiles=no_tiles_but_wall,
+                player_choice=player_choice,
+                highlighted_tile=highlighted_tile,
+                is_tile_hovered=partial_move is not None,
             )
 
         # Center pile
@@ -585,10 +826,24 @@ class Game:
                 positions = self.get_rendering_positions(tile_type, center_pile=True)
 
                 for position in positions:
-                    self.canvas.blit(
-                        self.images[tile_type].normal,
-                        (position.x, position.y),
+                    faded = partial_move is not None and (
+                        partial_move.factory_index != -1
+                        or partial_move.drawing != tile_type
                     )
+                    if (
+                        partial_move
+                        and partial_move.factory_index == -1
+                        and tile_type == STARTING_MARKER
+                    ):
+                        faded = False
+
+                    self.render_tile(tile_type, position, faded=faded)
+
+                    if player_choice is not None:
+                        color = COLOR_RED if player_choice == "tile" else COLOR_GRAY
+                        alpha = FADED_IMAGE_ALPHA if faded else 255
+
+                        self.render_tile_outline(position, color, alpha)
 
         # Ties
         if ties != -1:
