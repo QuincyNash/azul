@@ -44,5 +44,5 @@ def test_points(benchmark: Benchmark):
 def test_evaluation(benchmark: Benchmark):
     game = Game(graphics_info=None, seed=0)
     points_result = game.calculate_points(flag="include_bonus")
-    player_eval = load_player_eval("v2")
+    player_eval = load_player_eval("v3")
     benchmark(game_evaluation, points_result, player_eval["player_evaluation"])
