@@ -51,7 +51,7 @@ def init() -> GraphicsInfo:
 
         image = pygame.transform.smoothscale(image, (TILE_SIZE, TILE_SIZE))
         faded_image = pygame.transform.smoothscale(image, (TILE_SIZE, TILE_SIZE))
-        faded_image.set_alpha(65)
+        faded_image.set_alpha(FADED_IMAGE_ALPHA)
 
         images[tile] = TileImage(faded=faded_image, normal=image)
 
