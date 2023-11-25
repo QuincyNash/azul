@@ -1,0 +1,49 @@
+{
+	"player1": {
+		"pattern_lines": [
+			{ "tile": "EMPTY", "space": 1 },
+			{ "tile": "EMPTY", "space": 2 },
+			{ "tile": "EMPTY", "space": 3 },
+			{ "tile": "EMPTY", "space": 4 },
+			{ "tile": "EMPTY", "space": 5 }
+		],
+		"wall": [
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"]
+		],
+		"floor": ["STARTING_MARKER"],
+		"points": 0,
+		"has_starting_marker": true
+	},
+	"player2": {
+		"pattern_lines": [
+			{ "tile": "EMPTY", "space": 1 },
+			{ "tile": "EMPTY", "space": 2 },
+			{ "tile": "EMPTY", "space": 3 },
+			{ "tile": "EMPTY", "space": 4 },
+			{ "tile": "EMPTY", "space": 5 }
+		],
+		"wall": [
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
+			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"]
+		],
+		"floor": [],
+		"points": 0,
+		"has_starting_marker": false
+	},
+	"factories": [
+		{ "BLUE": 0, "YELLOW": 0, "RED": 1, "BLACK": 2, "STAR": 1 },
+		{ "BLUE": 1, "YELLOW": 0, "RED": 0, "BLACK": 1, "STAR": 2 },
+		{},
+		{},
+		{}
+	],
+	"center_pile": {},
+	"turn": 1
+}
