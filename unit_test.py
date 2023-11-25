@@ -31,6 +31,9 @@ def test_game_points():
     game.players[0].pattern_lines[2].tile = BLUE
     game.players[0].pattern_lines[2].space = 0
 
+    game.players[0].pattern_lines[4].tile = YELLOW
+    game.players[0].pattern_lines[4].space = 2
+
     five_of_a_kind_pos = [[0, 0], [1, 1], [3, 3], [4, 4]]
     vertical_line_pos = [[2, 0], [2, 1], [2, 3], [2, 4]]
     horizontal_line_pos = [[0, 2], [1, 2], [3, 2], [4, 2]]
@@ -87,10 +90,37 @@ def test_game_points():
         == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
         and game_points.negative_floor_points == 0
     )
-    assert (
-        sum([point_change.points for point_change in game2_points.point_changes]) == 9
-    )
-    assert sum([point_change.points for point_change in game_points.point_changes]) == 9
+    for g_points in [game_points, game2_points]:
+        assert (
+            sum(
+                [
+                    (change.points if change.completed else 0)
+                    for change in g_points.point_changes
+                ]
+            )
+            == 9
+        )
+        assert (
+            sum(
+                [
+                    (change.points if not change.completed else 0)
+                    for change in g_points.point_changes
+                ]
+            )
+            == 1
+        )
+        assert g_points.point_changes[1].space_left == 2
+
+    game = Game(graphics_info=None, seed=0)
+    game.players[0].wall[2][1] = True
+    game.players[0].wall[2][0] = True
+    game.players[0].pattern_lines[2].tile = BLUE
+    game.players[0].pattern_lines[2].space = 2
+
+    game_points = game.calculate_points()
+    assert game_points[0].point_changes[0].completed == False
+    assert game_points[0].point_changes[0].points == 3
+    assert game_points[0].point_changes[0].space_left == 2
 
 
 def test_game_all_moves():
@@ -112,6 +142,16 @@ def test_game_all_moves():
         assert moves is not None
         assert isinstance(moves[0], Move)
         assert len(moves) == FACTORY_COUNT * (WALL_SIZE + 1)
+
+
+def test_game_json_encoding():
+    game = Game(graphics_info=None, seed=0)
+    original_game = game.copy()
+
+    json_game = game.to_json(0)
+    game.from_json(json_game)
+
+    assert original_game.serialize() == game.serialize()
 
 
 def test_are_no_moves():
