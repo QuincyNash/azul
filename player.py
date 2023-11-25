@@ -7,6 +7,7 @@ import pygame
 
 if TYPE_CHECKING:
     from graphics import GraphicsInfo, ImageFileName
+    from game import PartialMove
 
 
 @dataclass(slots=True)
@@ -36,6 +37,9 @@ class Player:
         self.points = 0
         self.has_starting_marker = False
 
+        # Value of -1 represents the floor line
+        self.hovered_pattern_line: Union[int, None] = None
+
         # Create five pattern lines in a triangle formation
         self.pattern_lines: List[PatternLine] = [
             PatternLine(tile=EMPTY, space=i + 1) for i in range(WALL_SIZE)
@@ -60,7 +64,7 @@ class Player:
     ) -> List[pygame.math.Vector2]:
         positions: List[pygame.math.Vector2] = []
 
-        w_transform = TILE_BORDER + SECTION_SPACING
+        w_transform = 1 + SECTION_SPACING
         h_transform = PLAYER_HEIGHT if self.index == 1 else 0
 
         if type == "pattern_line":
@@ -85,7 +89,7 @@ class Player:
             x_pos = (
                 (TILE_SIZE + TILE_SPACING) * (WALL_SIZE + x)
                 - TILE_SPACING
-                + TILE_BORDER
+                + 1
                 + SECTION_SPACING
             )
             y_pos = SCORE_HEIGHT + (TILE_SIZE + TILE_SPACING) * line_index
@@ -115,6 +119,8 @@ class Player:
         *,
         wins: int = -1,
         no_tiles_but_wall: bool = False,
+        highlight_lines: bool = False,
+        partial_move: Union[PartialMove, None] = None,
     ) -> None:
         def draw_tile_and_border(
             x_pos: float,
@@ -128,12 +134,12 @@ class Player:
                 canvas,
                 COLOR_BROWN,
                 (
-                    x_pos - TILE_BORDER,
-                    y_pos - TILE_BORDER,
-                    TILE_SIZE + TILE_BORDER * 2,
-                    TILE_SIZE + TILE_BORDER * 2,
+                    x_pos - 1,
+                    y_pos - 1,
+                    TILE_SIZE + 2,
+                    TILE_SIZE + 2,
                 ),
-                width=TILE_BORDER,
+                width=1,
             )
             if tile != EMPTY and (not no_tiles_but_wall or force_tiles):
                 canvas.blit(
@@ -158,6 +164,9 @@ class Player:
             for position in floor_positions + pattern_line_positions:
                 draw_tile_and_border(position.x, position.y, tile_type, faded=False)
 
+        mouse = pygame.Vector2(pygame.mouse.get_pos())
+        self.hovered_pattern_line = None
+
         # Pattern Lines
         for row_index in range(len(self.pattern_lines)):
             y_pos = SCORE_HEIGHT + (TILE_SIZE + TILE_SPACING) * row_index
@@ -169,13 +178,55 @@ class Player:
                     w_transform + x_pos, h_transform + y_pos, EMPTY, faded=False
                 )
 
+            if (
+                highlight_lines
+                and self.index == 0
+                and partial_move
+                and (
+                    partial_move.drawing == self.pattern_lines[row_index].tile
+                    or self.pattern_lines[row_index].tile == EMPTY
+                )
+                and self.pattern_lines[row_index].space > 0
+                and self.wall[row_index][
+                    TILE_POSITIONS[partial_move.drawing][row_index]
+                ]
+                == EMPTY
+            ):
+                rect_x = (
+                    w_transform
+                    + (TILE_SIZE + TILE_SPACING) * (WALL_SIZE - row_index - 1)
+                    - 2
+                )
+                rect_y = h_transform + y_pos - 2
+                rect_w = (TILE_SIZE + TILE_SPACING) * (row_index + 1) - 4
+                rect_h = TILE_SIZE + TILE_SPACING - 4
+
+                if (
+                    rect_x <= mouse.x <= rect_x + rect_w
+                    and rect_y <= mouse.y <= rect_y + rect_h
+                ):
+                    self.hovered_pattern_line = row_index
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+
+                pygame.draw.rect(
+                    canvas,
+                    COLOR_RED,
+                    (
+                        rect_x,
+                        rect_y,
+                        rect_w,
+                        rect_h,
+                    ),
+                    width=2,
+                )
+
         # Wall
         for y in range(WALL_SIZE):
             for x in range(WALL_SIZE):
                 x_pos = (
                     (TILE_SIZE + TILE_SPACING) * (WALL_SIZE + x)
                     - TILE_SPACING
-                    + TILE_BORDER
+                    + 1
                     + SECTION_SPACING
                 )
                 y_pos = SCORE_HEIGHT + (TILE_SIZE + TILE_SPACING) * y
@@ -207,6 +258,26 @@ class Player:
                 )
             )
             canvas.blit(text, text_rect)
+
+        if highlight_lines and self.index == 0:
+            rect_x = w_transform - 2
+            rect_y = h_transform + PLAYER_HEIGHT - TILE_SIZE - SECTION_SPACING - 2
+            rect_w = (TILE_SIZE + FLOOR_TILE_SPACING) * NUM_FLOOR_TILES - 4
+            rect_h = TILE_SIZE + 3
+
+            if (
+                rect_x <= mouse.x <= rect_x + rect_w
+                and rect_y <= mouse.y <= rect_y + rect_h
+            ):
+                self.hovered_pattern_line = -1
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+
+            pygame.draw.rect(
+                canvas,
+                COLOR_RED,
+                (rect_x, rect_y, rect_w, rect_h),
+                width=2,
+            )
 
         # Score
         text = self.main_font.render(f"Score: {self.points}", True, BLACK)
