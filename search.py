@@ -7,8 +7,6 @@ from dataclasses import dataclass
 import time
 import pickle
 
-from player import Player
-
 
 @dataclass
 class SearchedNode:
@@ -81,7 +79,6 @@ def get_best_move(
         transposition_lookups += result.transposition_lookups
 
     table.clear()
-    # print(unique_nodes, total_nodes, transposition_lookups, time.perf_counter() - start_time)
 
     if isinstance(result, FinalResult):
         result.move = pickle.loads(pickle.dumps(result.move, -1))
