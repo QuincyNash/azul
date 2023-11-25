@@ -1,5 +1,4 @@
-from game import Game, Move, PointsResult
-from player import Player
+from game import Move, PointsResult
 import random
 
 
