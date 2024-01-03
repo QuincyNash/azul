@@ -306,6 +306,7 @@ class Game:
     ) -> int:
         column_index = TILE_POSITIONS[tile][row_index]
         potential_points = 1  # Count the tile that was placed
+        horizontal_movement = False
 
         # Count all placed tiles in each row and column
         for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
@@ -315,8 +316,11 @@ class Game:
                 potential_points += 1
                 xpos += xdir
                 ypos += ydir
+                # There is a tile left or right of the placed tile, so count the placed tile twice
+                if xdir != 0:
+                    horizontal_movement = True
 
-        return potential_points
+        return potential_points + horizontal_movement
 
     def calculate_bonus_points(self, wall: List[List[bool]]) -> int:
         bonus_points = 0
@@ -338,14 +342,8 @@ class Game:
     def calculate_negative_floor_points(
         self, floor: List[Union[Tile, Literal[6]]]
     ) -> int:
-        floor_negative_points = 0
-
-        # Starting floor points are stored in NEGATIVE_FLOOR_POINTS, the rest count as MAX_NEGATIVE_FLOOR_POINTS
-        leftover = max(len(floor) - len(NEGATIVE_FLOOR_POINTS), 0)
-        floor_negative_points += sum(NEGATIVE_FLOOR_POINTS[: len(floor)])
-        floor_negative_points += MAX_NEGATIVE_FLOOR_POINTS * leftover
-
-        return floor_negative_points
+        # Floor points are stored in NEGATIVE_FLOOR_POINTS (sum the first n which are occupied)
+        return sum(NEGATIVE_FLOOR_POINTS[: len(floor)])
 
     def calculate_points_and_modify(
         self, *, flag: Literal["bonus_only", "include_bonus", "normal"] = "normal"

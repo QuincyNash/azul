@@ -60,9 +60,9 @@ def test_game_points():
 
     assert (
         game.players[0].points
-        == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS + 9
+        == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS + 10
     )
-    assert game2.players[0].points == 9
+    assert game2.players[0].points == 10
     assert (
         game3.players[0].points
         == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
@@ -98,7 +98,7 @@ def test_game_points():
                     for change in g_points.point_changes
                 ]
             )
-            == 9
+            == 10
         )
         assert (
             sum(
@@ -119,7 +119,7 @@ def test_game_points():
 
     game_points = game.calculate_points()
     assert game_points[0].point_changes[0].completed == False
-    assert game_points[0].point_changes[0].points == 3
+    assert game_points[0].point_changes[0].points == 4
     assert game_points[0].point_changes[0].space_left == 2
 
 
