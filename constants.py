@@ -15,8 +15,7 @@ FACTORY_COUNT = 5
 NUM_EACH_TILE = 20
 TILES_PER_FACTORY = 4
 WALL_SIZE = 5
-NEGATIVE_FLOOR_POINTS = [1, 1, 2, 2, 2]
-MAX_NEGATIVE_FLOOR_POINTS = 3
+NEGATIVE_FLOOR_POINTS = [1, 1, 2, 2, 2, 3, 3]
 HORIZONTAL_LINE_BONUS = 2
 VERTICAL_LINE_BONUS = 7
 FIVE_OF_A_KIND_BONUS = 10
@@ -40,6 +39,13 @@ FONT_FILE_NAME = "pixelized"
 FLOOR_FONT_SIZE = 15
 MAIN_FONT_SIZE = 25
 FADED_IMAGE_ALPHA = 65
+
+# Data piping constants
+CURRENT_BEST = "current_best"
+BEST_MOVE = "best_move"
+DEPTH = "depth"
+EVALUATION = "evaluation"
+DataType = Literal["current_best", "best_move", "depth", "evaluation"]
 
 EMPTY = 0
 BLUE = 1
