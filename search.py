@@ -1,4 +1,4 @@
-from typing import Tuple, Literal, List, Dict, Union
+from typing import Any, Tuple, Literal, List, Dict, Union, TypedDict
 from constants import *
 from evaluation import EvaluationVersion, game_evaluation_for_player
 from game import Game, Move
@@ -6,6 +6,7 @@ from tqdm import tqdm
 from dataclasses import dataclass
 import time
 import pickle
+from multiprocessing.connection import Connection
 
 
 @dataclass
@@ -20,13 +21,17 @@ class EvaluatedNode:
     score: float
     unique_nodes_searched: int
     nodes_searched: int
-    transposition_lookups: int
 
 
 @dataclass
 class FinalResult(EvaluatedNode):
     move: Move
-    move_order: List[int]
+    move_order: List[Move]
+
+
+class ConnectionData(TypedDict):
+    data: Any
+    type: DataType
 
 
 table: Dict[bytes, SearchedNode] = {}
@@ -40,33 +45,39 @@ def get_best_move(
     search_time: float,
     *,
     show_progress: bool = True,
+    connection: Union[Connection, None] = None,
 ) -> FinalResult:
     total_nodes = 0
     unique_nodes = 0
-    transposition_lookups = 0
     start_time = time.perf_counter()
     result: Union[EvaluatedNode, FinalResult, None] = None
-    move_order: List[int] = []
+    move_order: List[Move] = []
 
     player_eval = player1_eval if turn == 0 else player2_eval
 
     # Iterative deepening
-    for d in range(1, 4 * FACTORY_COUNT + 1):
+    for depth in range(1, 4 * FACTORY_COUNT + 1):
+        if connection != None:
+            connection.send({"data": depth, "type": DEPTH})
+
         current_time = time.perf_counter()
         time_left = start_time - current_time + search_time
 
         if time_left <= 0:
             break
 
+        # print(move_order)
+
         result = negascout(
             player_eval,
             game.copy(),
             turn,
-            d,
-            d,
+            depth,
+            depth,
             move_order=move_order,
             time_left=time_left,
             show_progress=show_progress,
+            connection=connection,
         )
 
         if isinstance(result, FinalResult) and result.move_order != None:
@@ -76,13 +87,16 @@ def get_best_move(
 
         total_nodes += result.nodes_searched
         unique_nodes += result.unique_nodes_searched
-        transposition_lookups += result.transposition_lookups
 
     table.clear()
 
     if isinstance(result, FinalResult):
         result.move = pickle.loads(pickle.dumps(result.move, -1))
         result.nodes_searched = total_nodes
+        print(f"{result.nodes_searched / COMPUTER_MOVE_TIME} nodes/second")
+
+        if connection != None:
+            connection.send({"data": result, "type": BEST_MOVE})
 
         return result
     else:
@@ -99,45 +113,16 @@ def negascout(
     max_depth: int,
     *,
     time_left: float = 999999,
-    move_order: Union[List[int], None] = None,
+    move_order: Union[List[Move], None] = None,
     alpha: float = -999999,
     beta: float = 999999,
     show_progress: bool = False,
+    connection: Union[Connection, None] = None,
 ) -> Union[EvaluatedNode, FinalResult]:
     start_time = time.perf_counter()
 
-    alpha_orig = alpha
     nodes = 0
     unique_nodes = 0
-    transposition_lookups = 0
-
-    # Make sure that the game is not on the first turn of the tree (leads to problems with EvaluatedNode vs. FinalResult)
-    if depth < max_depth:
-        table_entry = table.get(game.serialize())
-
-        # See if this position is in the transposition table
-        if table_entry != None and table_entry.depth >= depth:
-            if table_entry.flag == "exact":
-                return EvaluatedNode(
-                    score=table_entry.score,
-                    unique_nodes_searched=0,
-                    nodes_searched=1,
-                    transposition_lookups=1,
-                )
-            elif table_entry.flag == "lower":
-                alpha = max(alpha, table_entry.score)
-                transposition_lookups += 1
-            elif table_entry.flag == "upper":
-                beta = min(beta, table_entry.score)
-                transposition_lookups += 1
-
-            if alpha >= beta:
-                return EvaluatedNode(
-                    score=table_entry.score,
-                    unique_nodes_searched=0,
-                    nodes_searched=1,
-                    transposition_lookups=transposition_lookups,
-                )
 
     # # Make sure that the game is not on the first turn of the tree (leads to problems with EvaluatedNode vs. FinalResult)
     if depth < max_depth and (depth == 0 or game.are_no_moves()):
@@ -150,36 +135,25 @@ def negascout(
             ),
             unique_nodes_searched=1,
             nodes_searched=1,
-            transposition_lookups=0,
         )
 
-    all_moves = game.all_moves(turn)
-
-    if move_order == None:
-        move_order = []
-
-    # Sort moves based on move_order
-    if len(move_order) > 0:
-        moves_and_scores = list(zip(move_order, all_moves))
-        # Look at best moves first (smallest move order)
-        moves_and_scores.sort(key=lambda x: x[0])
-        all_moves = [x[1] for x in moves_and_scores]
+    if move_order is not None and len(move_order) > 0:
+        all_moves = pickle.loads(pickle.dumps(move_order, -1))
     else:
-        # Use basic evaluation
+        all_moves = game.all_moves(turn)
         all_moves.sort(
             key=lambda move: player_eval["move_potential"](move),
             reverse=True,
         )
 
-    move_scores: List[Tuple[int, float]] = []
-    new_move_order: List[int] = []
+    move_scores: List[Tuple[Move, float]] = []
+    new_move_order: List[Move] = []
     best_move = all_moves[0]
     best_score = -999999
     result: EvaluatedNode = EvaluatedNode(
         score=-999999,
         unique_nodes_searched=0,
         nodes_searched=0,
-        transposition_lookups=0,
     )
 
     # Tqdm is for a progress bar
@@ -193,22 +167,7 @@ def negascout(
                 score=best_score,
                 unique_nodes_searched=unique_nodes,
                 nodes_searched=nodes,
-                transposition_lookups=transposition_lookups,
             )
-
-        # Basic alpha beta pruning
-        # result = negascout(
-        #     new_state,
-        #     (turn + 1) % 2,
-        #     depth - 1,
-        #     max_depth,
-        #     alpha=-beta,
-        #     beta=-alpha,
-        # )
-        # result.score *= -1
-        # nodes += result.nodes_searched
-        # unique_nodes += result.unique_nodes_searched
-        # transposition_lookups += result.transposition_lookups
 
         # Negascout
         if index == 0:
@@ -224,7 +183,6 @@ def negascout(
             result.score *= -1
             nodes += result.nodes_searched
             unique_nodes += result.unique_nodes_searched
-            transposition_lookups += result.transposition_lookups
         else:
             # Null window search
             result = negascout(
@@ -239,7 +197,6 @@ def negascout(
             result.score *= -1
             nodes += result.nodes_searched
             unique_nodes += result.unique_nodes_searched
-            transposition_lookups += result.transposition_lookups
 
             # If null window failed high, do a full re-search
             if alpha < result.score < beta:
@@ -255,16 +212,18 @@ def negascout(
                 result.score *= -1
                 nodes += result.nodes_searched
                 unique_nodes += result.unique_nodes_searched
-                transposition_lookups += result.transposition_lookups
 
         game.undo_move(turn, move)
 
         if depth == max_depth:
-            move_scores.append((index, result.score))
+            move_scores.append((move, result.score))
 
         if result.score > best_score:
             best_move = move
             best_score = result.score
+            if connection:
+                connection.send({"data": best_score, "type": EVALUATION})
+                # connection.send({"data": best_move, "type": CURRENT_BEST})
 
         alpha = max(alpha, result.score)
         if alpha >= beta:
@@ -275,13 +234,13 @@ def negascout(
         move_scores.sort(key=lambda x: x[1], reverse=True)
         new_move_order = [x[0] for x in move_scores]
 
-    table_entry = SearchedNode(score=best_score, depth=depth, flag="exact")
-    if best_score <= alpha_orig:
-        table_entry.flag = "upper"
-    elif best_score >= beta:
-        table_entry.flag = "lower"
-    table_entry.depth = depth
-    table[game.serialize()] = table_entry
+    # table_entry = SearchedNode(score=best_score, depth=depth, flag="exact")
+    # if best_score <= alpha_orig:
+    #     table_entry.flag = "upper"
+    # elif best_score >= beta:
+    #     table_entry.flag = "lower"
+    # table_entry.depth = depth
+    # table[game.serialize()] = table_entry
 
     return FinalResult(
         move=best_move,
@@ -289,5 +248,4 @@ def negascout(
         score=best_score,
         unique_nodes_searched=unique_nodes,
         nodes_searched=nodes,
-        transposition_lookups=transposition_lookups,
     )
