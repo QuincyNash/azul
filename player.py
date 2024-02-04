@@ -3,6 +3,7 @@ from constants import *
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Union
 import pygame
+from utils import Vector
 
 
 if TYPE_CHECKING:
@@ -61,8 +62,8 @@ class Player:
         tile: Union[Tile, Literal[6]],
         type: Literal["wall", "pattern_line", "floor"],
         line_index: int = 0,
-    ) -> List[pygame.math.Vector2]:
-        positions: List[pygame.math.Vector2] = []
+    ) -> List[Vector]:
+        positions: List[Vector] = []
 
         w_transform = 1 + SECTION_SPACING
         h_transform = PLAYER_HEIGHT if self.index == 1 else 0
@@ -79,9 +80,7 @@ class Player:
                     else EMPTY
                 )
                 if tile == tile_type:
-                    positions.append(
-                        pygame.math.Vector2(w_transform + x_pos, h_transform + y_pos)
-                    )
+                    positions.append(Vector(w_transform + x_pos, h_transform + y_pos))
 
         elif type == "wall" and tile != STARTING_MARKER:
             x = TILE_POSITIONS[tile][line_index]
@@ -94,9 +93,7 @@ class Player:
             )
             y_pos = SCORE_HEIGHT + (TILE_SIZE + TILE_SPACING) * line_index
 
-            positions.append(
-                pygame.math.Vector2(w_transform + x_pos, h_transform + y_pos)
-            )
+            positions.append(Vector(w_transform + x_pos, h_transform + y_pos))
 
         elif type == "floor":
             for x in range(NUM_FLOOR_TILES):
@@ -105,9 +102,7 @@ class Player:
                 tile_type = self.floor[x] if x < len(self.floor) else EMPTY
 
                 if tile == tile_type:
-                    positions.append(
-                        pygame.math.Vector2(w_transform + x_pos, h_transform + y_pos)
-                    )
+                    positions.append(Vector(w_transform + x_pos, h_transform + y_pos))
 
         return positions
 
@@ -155,7 +150,7 @@ class Player:
         for tile_type in types:
             floor_positions = self.get_rendering_positions(tile_type, "floor")
 
-            pattern_line_positions: List[pygame.math.Vector2] = []
+            pattern_line_positions: List[Vector] = []
             for line_index in range(WALL_SIZE):
                 pattern_line_positions.extend(
                     self.get_rendering_positions(tile_type, "pattern_line", line_index)

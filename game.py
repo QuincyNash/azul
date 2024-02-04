@@ -1,9 +1,8 @@
 from __future__ import annotations
-
-
 from constants import *
 from graphics import GraphicsInfo
 from player import Player, PatternLine
+from utils import Vector
 from typing import List, Tuple, Union, Literal
 from dataclasses import dataclass
 from collections import Counter
@@ -521,16 +520,14 @@ class Game:
         return moves
 
     # Rendering location of factories
-    def factory_position(self, index: int) -> pygame.math.Vector2:
+    def factory_position(self, index: int) -> Vector:
         radius = CENTER_SIZE // 2 - FACTORY_RADIUS - CENTER_BORDER
 
         angle = 360 / FACTORY_COUNT * index - 90
         x_pos = int(radius * math.cos(math.radians(angle)))
         y_pos = int(radius * math.sin(math.radians(angle)))
 
-        return pygame.math.Vector2(
-            PLAYER_WIDTH + CENTER_SIZE // 2 + x_pos, CENTER_SIZE // 2 + y_pos
-        )
+        return Vector(PLAYER_WIDTH + CENTER_SIZE // 2 + x_pos, CENTER_SIZE // 2 + y_pos)
 
     # Used for piece animation
     def get_rendering_positions(
@@ -542,8 +539,8 @@ class Game:
         player_index: int = 0,
         line_index: int = 0,
         player_type: Literal["wall", "pattern_line", "floor"] = "wall",
-    ) -> List[pygame.math.Vector2]:
-        positions: List[pygame.math.Vector2] = []
+    ) -> List[Vector]:
+        positions: List[Vector] = []
 
         if factory_index != -1:
             factory_tiles: List[Tile] = []
@@ -561,9 +558,7 @@ class Game:
                     x_pos = (x_off - 1) * (TILE_SIZE // 2) + x_off * TILE_SPACING // 2
                     y_pos = (y_off - 1) * (TILE_SIZE // 2) + y_off * TILE_SPACING // 2
 
-                    positions.append(
-                        pygame.math.Vector2(transform.x + x_pos, transform.y + y_pos)
-                    )
+                    positions.append(Vector(transform.x + x_pos, transform.y + y_pos))
 
         elif center_pile:
             tiles: List[Union[Tile, Literal[6]]] = []
@@ -596,7 +591,7 @@ class Game:
                             + (TILE_SIZE + TILE_SPACING) * y
                         )
 
-                        positions.append(pygame.math.Vector2(x_pos, y_pos))
+                        positions.append(Vector(x_pos, y_pos))
 
         else:
             return self.players[player_index].get_rendering_positions(
@@ -608,7 +603,7 @@ class Game:
     def render_tile(
         self,
         tile: Union[Tile, Literal[6]],
-        position: pygame.math.Vector2,
+        position: Vector,
         *,
         faded=False,
     ):
@@ -618,7 +613,7 @@ class Game:
             self.canvas.blit(self.images[tile].normal, (position.x, position.y))
 
     def render_tile_outline(
-        self, position: pygame.math.Vector2, color: Tuple[int, int, int], alpha: int
+        self, position: Vector, color: Tuple[int, int, int], alpha: int
     ) -> None:
         surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
         alpha_color = color + (alpha,)
@@ -671,7 +666,7 @@ class Game:
                         self.render_tile_outline(position, color, alpha)
 
     def get_hovered_partial_move(self) -> Union[PartialMove, None]:
-        mouse = pygame.Vector2(pygame.mouse.get_pos())
+        mouse = Vector(*pygame.mouse.get_pos())
         hover_tile: Union[Tile, None] = None
         hover_factory: Union[int, None] = None
 
