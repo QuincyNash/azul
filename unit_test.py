@@ -6,27 +6,27 @@ import pytest
 
 
 def test_game_init():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     assert isinstance(game, Game)
 
 
 def test_game_serialize():
-    game1 = Game(graphics_info=None, seed=0)
-    game2 = Game(graphics_info=None, seed=0)
+    game1 = Game(seed=0)
+    game2 = Game(seed=0)
     random.shuffle(game2.factories)
 
     assert game1.serialize() == game2.serialize()
 
 
 def test_game_copy():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     game_copy = game.copy()
 
     assert game.serialize() == game_copy.serialize()
 
 
 def test_game_points():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
 
     game.players[0].pattern_lines[2].tile = BLUE
     game.players[0].pattern_lines[2].space = 0
@@ -111,7 +111,7 @@ def test_game_points():
         )
         assert g_points.point_changes[1].space_left == 2
 
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     game.players[0].wall[2][1] = True
     game.players[0].wall[2][0] = True
     game.players[0].pattern_lines[2].tile = BLUE
@@ -124,7 +124,7 @@ def test_game_points():
 
 
 def test_game_all_moves():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     game.factories = [
         Counter({BLUE: 1}),
         Counter({BLACK: 1}),
@@ -145,7 +145,7 @@ def test_game_all_moves():
 
 
 def test_game_json_encoding():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     original_game = game.copy()
 
     json_game = game.to_json(0)
@@ -155,7 +155,7 @@ def test_game_json_encoding():
 
 
 def test_are_no_moves():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     game.factories = [Counter() for _ in range(5)]
     game.center_pile = Counter()
 
@@ -163,7 +163,7 @@ def test_are_no_moves():
 
 
 def test_game_state():
-    game = Game(graphics_info=None, seed=0)
+    game = Game(seed=0)
     moves = game.all_moves(0)
 
     game.make_move(0, moves[0])

@@ -16,7 +16,7 @@ import json
 # print(time.perf_counter() - start)
 
 graphics_info = graphics.init()
-game = Game(graphics_info=graphics_info, seed=10)
+game = Game(seed=10)
 game.from_json(json.load(open("game_state.json", "r")))
 
 pygame.event.set_allowed([pygame.QUIT])
@@ -32,6 +32,8 @@ player1_wins = 0
 player2_wins = 0
 
 eval_version = load_player_eval(EVALUATION_VERSION)
+graphics.render_game(game, graphics_info)
+pygame.display.update()
 
 while not quit:
     for event in pygame.event.get():
@@ -57,13 +59,13 @@ while not quit:
             else:
                 game = new_game.copy()
 
-            game.render()
+            graphics.render_game(game, graphics_info)
             pygame.display.update()
             time.sleep(PAUSE_TIME_AFTER_MOVE)
 
         # Update and render animation
         else:
-            game.render(no_tiles_but_wall=True)
+            graphics.render_game(game, graphics_info, no_tiles_but_wall=True)
             animation.render()
             pygame.display.update()
 
@@ -77,7 +79,7 @@ while not quit:
 
             animation = Animation(turn, game, None, new_game, graphics_info)
 
-            game.render()
+            graphics.render_game(game, graphics_info)
             pygame.display.update()
 
         # Start the move animation
@@ -93,7 +95,7 @@ while not quit:
             animation = Animation(turn, game, result.move, new_game, graphics_info)
             turn = (turn + 1) % 2
 
-        game.render()
+        graphics.render_game(game, graphics_info)
         pygame.display.update()
 
     graphics_info.clock.tick(FRAME_RATE)

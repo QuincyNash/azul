@@ -1,7 +1,7 @@
 from typing import Literal, List, Dict, Union
 
 
-COMPUTER_MOVE_TIME = 10  # seconds
+COMPUTER_MOVE_TIME = 5  # seconds
 EVALUATION_VERSION = "v3"
 
 

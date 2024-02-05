@@ -14,9 +14,9 @@
 			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"],
 			["EMPTY", "EMPTY", "EMPTY", "EMPTY", "EMPTY"]
 		],
-		"floor": ["STARTING_MARKER"],
+		"floor": [],
 		"points": 0,
-		"has_starting_marker": true
+		"has_starting_marker": false
 	},
 	"player2": {
 		"pattern_lines": [
@@ -40,10 +40,10 @@
 	"factories": [
 		{ "BLUE": 0, "YELLOW": 0, "RED": 1, "BLACK": 2, "STAR": 1 },
 		{ "BLUE": 1, "YELLOW": 0, "RED": 0, "BLACK": 1, "STAR": 2 },
-		{},
-		{},
-		{}
+		{ "BLUE": 2, "YELLOW": 1, "RED": 1 },
+		{ "BLUE": 0, "YELLOW": 2, "BLACK": 1, "STAR": 1 },
+		{ "BLUE": 1, "RED": 3 }
 	],
-	"center_pile": {},
+	"center_pile": { "STARTING_MARKER": 1 },
 	"turn": 1
 }

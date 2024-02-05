@@ -1,17 +1,12 @@
 from __future__ import annotations
 from constants import *
-from graphics import GraphicsInfo
 from player import Player, PatternLine
-from utils import Vector
-from typing import List, Tuple, Union, Literal
+from typing import List, Union, Literal
 from dataclasses import dataclass
 from collections import Counter
 import struct
 import random
-import math
 import pickle
-import pygame
-from pygame import gfxdraw
 
 
 move_counter = 0
@@ -56,19 +51,9 @@ class PointsResult:
 
 
 class Game:
-    def __init__(self, graphics_info: Union[GraphicsInfo, None], *, seed=None) -> None:
+    def __init__(self, *, seed=None) -> None:
         if seed is not None:
             random.seed(seed)
-
-        # Unpack graphics variables
-        if graphics_info:
-            (
-                self.canvas,
-                self.clock,
-                self.floor_font,
-                self.main_font,
-                self.images,
-            ) = graphics_info
 
         # Counters are used for factories to store the number of occurences of each tile
         # Create factories and populate each with 4 random tiles
@@ -79,29 +64,14 @@ class Game:
         self.center_pile[STARTING_MARKER] = 1
 
         self.players = [
-            Player(index=0, graphics_info=graphics_info),
-            Player(index=1, graphics_info=graphics_info),
+            Player(index=0),
+            Player(index=1),
         ]
 
         self.new_round()
 
     def copy(self) -> Game:
         copied_game: Game = pickle.loads(pickle.dumps(self, -1))
-
-        if hasattr(self, "canvas"):
-            # Reinstantiate graphics information, copied versions get corrupted by pygame
-            copied_game.canvas = self.canvas
-            copied_game.clock = self.clock
-            copied_game.floor_font = self.floor_font
-            copied_game.main_font = self.main_font
-            copied_game.images = self.images
-
-            for player in copied_game.players:
-                player.canvas = self.canvas
-                player.clock = self.clock
-                player.floor_font = self.floor_font
-                player.main_font = self.main_font
-                player.images = self.images
 
         return copied_game
 
@@ -518,333 +488,3 @@ class Game:
                             )
 
         return moves
-
-    # Rendering location of factories
-    def factory_position(self, index: int) -> Vector:
-        radius = CENTER_SIZE // 2 - FACTORY_RADIUS - CENTER_BORDER
-
-        angle = 360 / FACTORY_COUNT * index - 90
-        x_pos = int(radius * math.cos(math.radians(angle)))
-        y_pos = int(radius * math.sin(math.radians(angle)))
-
-        return Vector(PLAYER_WIDTH + CENTER_SIZE // 2 + x_pos, CENTER_SIZE // 2 + y_pos)
-
-    # Used for piece animation
-    def get_rendering_positions(
-        self,
-        tile: Union[Tile, Literal[6]],
-        *,
-        center_pile: bool = False,
-        factory_index: int = -1,
-        player_index: int = 0,
-        line_index: int = 0,
-        player_type: Literal["wall", "pattern_line", "floor"] = "wall",
-    ) -> List[Vector]:
-        positions: List[Vector] = []
-
-        if factory_index != -1:
-            factory_tiles: List[Tile] = []
-            for tile_type in TILE_TYPES:
-                factory_tiles.extend(
-                    [tile_type for _ in range(self.factories[factory_index][tile_type])]
-                )
-
-            transform = self.factory_position(factory_index)
-
-            offsets = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
-            for index, factory_tile in enumerate(factory_tiles):
-                if factory_tile == tile:
-                    x_off, y_off = offsets[index]
-                    x_pos = (x_off - 1) * (TILE_SIZE // 2) + x_off * TILE_SPACING // 2
-                    y_pos = (y_off - 1) * (TILE_SIZE // 2) + y_off * TILE_SPACING // 2
-
-                    positions.append(Vector(transform.x + x_pos, transform.y + y_pos))
-
-        elif center_pile:
-            tiles: List[Union[Tile, Literal[6]]] = []
-            types: List[Union[Tile, Literal[6]]] = [
-                STARTING_MARKER,
-                *TILE_TYPES,
-            ]
-            for tile_type in types:
-                tiles.extend([tile_type for _ in range(self.center_pile[tile_type])])
-
-            for y in range(CENTER_GRID_SIZE):
-                for x in range(CENTER_GRID_SIZE):
-                    tile_type = (
-                        tiles[y * CENTER_GRID_SIZE + x]
-                        if y * CENTER_GRID_SIZE + x < len(tiles)
-                        else EMPTY
-                    )
-                    if tile_type == tile:
-                        x_pos = (
-                            PLAYER_WIDTH
-                            + CENTER_SIZE // 2
-                            - CENTER_GRID_SIZE * TILE_SIZE // 2
-                            - (CENTER_GRID_SIZE - 1) * TILE_SPACING // 2
-                            + (TILE_SIZE + TILE_SPACING) * x
-                        )
-                        y_pos = (
-                            CENTER_SIZE // 2
-                            - CENTER_GRID_SIZE * TILE_SIZE // 2
-                            - (CENTER_GRID_SIZE - 1) * TILE_SPACING // 2
-                            + (TILE_SIZE + TILE_SPACING) * y
-                        )
-
-                        positions.append(Vector(x_pos, y_pos))
-
-        else:
-            return self.players[player_index].get_rendering_positions(
-                tile, player_type, line_index
-            )
-
-        return positions
-
-    def render_tile(
-        self,
-        tile: Union[Tile, Literal[6]],
-        position: Vector,
-        *,
-        faded=False,
-    ):
-        if faded:
-            self.canvas.blit(self.images[tile].faded, (position.x, position.y))
-        else:
-            self.canvas.blit(self.images[tile].normal, (position.x, position.y))
-
-    def render_tile_outline(
-        self, position: Vector, color: Tuple[int, int, int], alpha: int
-    ) -> None:
-        surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
-        alpha_color = color + (alpha,)
-
-        pygame.draw.rect(surface, alpha_color, (0, 0, TILE_SIZE, TILE_SIZE), 2)
-
-        self.canvas.blit(surface, (position.x, position.y))
-
-    def render_factory(
-        self,
-        factory_index: int,
-        canvas: pygame.Surface,
-        w_transform: int,
-        h_transform: int,
-        *,
-        no_tiles: bool = False,
-        player_choice: Literal["tile", "line", None] = None,
-        highlighted_tile: Union[Tile, None] = None,
-        is_tile_hovered: bool = False,
-    ) -> None:
-        gfxdraw.aacircle(
-            canvas,
-            w_transform,
-            h_transform,
-            FACTORY_RADIUS,
-            COLOR_BLACK,
-        )
-
-        if not no_tiles:
-            for tile in TILE_TYPES:
-                positions = self.get_rendering_positions(
-                    tile, factory_index=factory_index
-                )
-
-                for position in positions:
-                    self.render_tile(
-                        tile,
-                        position,
-                        faded=is_tile_hovered and highlighted_tile != tile,
-                    )
-
-                    if player_choice is not None:
-                        color = COLOR_RED if player_choice == "tile" else COLOR_GRAY
-
-                        alpha = (
-                            FADED_IMAGE_ALPHA
-                            if is_tile_hovered and highlighted_tile != tile
-                            else 255
-                        )
-                        self.render_tile_outline(position, color, alpha)
-
-    def get_hovered_partial_move(self) -> Union[PartialMove, None]:
-        mouse = Vector(*pygame.mouse.get_pos())
-        hover_tile: Union[Tile, None] = None
-        hover_factory: Union[int, None] = None
-
-        for factory_index in [*range(FACTORY_COUNT), -1]:
-            for tile in TILE_TYPES:
-                if factory_index == -1:
-                    positions = self.get_rendering_positions(tile, center_pile=True)
-                else:
-                    positions = self.get_rendering_positions(
-                        tile, factory_index=factory_index
-                    )
-                for position in positions:
-                    if (
-                        position.x <= mouse.x <= position.x + TILE_SIZE
-                        and position.y <= mouse.y <= position.y + TILE_SIZE
-                    ):
-                        hover_tile = tile
-                        hover_factory = factory_index
-
-        if hover_factory is None or hover_tile is None:
-            return None
-
-        if hover_factory == -1:
-            return PartialMove(
-                drawing=hover_tile,
-                amount=self.center_pile[hover_tile],
-                moving_to_center=Counter(),
-                player_index=0,
-                factory_index=hover_factory,
-                is_center_draw=True,
-                first_draw_from_center=self.center_pile[STARTING_MARKER] == 1,
-            )
-        else:
-            modified_factory = self.factories[hover_factory].copy()
-            modified_factory[hover_tile] = 0
-
-            return PartialMove(
-                drawing=hover_tile,
-                amount=self.factories[hover_factory][hover_tile],
-                moving_to_center=modified_factory,
-                player_index=0,
-                factory_index=hover_factory,
-                is_center_draw=False,
-                first_draw_from_center=False,
-            )
-
-    def get_hovered_move(self, partial_move: PartialMove) -> Union[Move, None]:
-        pattern_line = self.players[0].hovered_pattern_line
-
-        if pattern_line is None:
-            return None
-
-        if pattern_line == -1:
-            amount = 0
-            floor_amount = partial_move.amount
-        else:
-            amount = min(
-                self.players[0].pattern_lines[pattern_line].space, partial_move.amount
-            )
-            floor_amount = partial_move.amount - amount
-
-        return Move(
-            drawing=partial_move.drawing,
-            amount=amount,
-            moving_to_center=partial_move.moving_to_center,
-            player_index=0,
-            factory_index=partial_move.factory_index,
-            pattern_line=pattern_line,
-            floor_tiles=[partial_move.drawing] * floor_amount,
-            is_center_draw=partial_move.is_center_draw,
-            first_draw_from_center=partial_move.first_draw_from_center,
-        )
-
-    def render(
-        self,
-        *,
-        player1_wins=-1,
-        player2_wins=-1,
-        ties=-1,
-        no_tiles_but_wall=False,
-        player_choice: Literal["tile", "line", None] = None,
-        partial_tile_move: Union[PartialMove, None] = None,
-    ) -> None:
-        self.canvas.fill(COLOR_WHITE)
-
-        if player_choice is not None and partial_tile_move is None:
-            partial_move = self.get_hovered_partial_move()
-
-            if partial_move is None:
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-            else:
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-
-        else:
-            partial_move = partial_tile_move
-            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-
-        # Line Borders
-        pygame.draw.aaline(
-            self.canvas, COLOR_BLACK, (PLAYER_WIDTH, 0), (PLAYER_WIDTH, TOTAL_HEIGHT)
-        )
-        pygame.draw.aaline(
-            self.canvas, COLOR_BLACK, (0, PLAYER_HEIGHT), (PLAYER_WIDTH, PLAYER_HEIGHT)
-        )
-
-        # Player display
-        for player_index, player in enumerate(self.players):
-            w_transform = 1 + SECTION_SPACING
-            h_transform = PLAYER_HEIGHT if player_index == 1 else 0
-            wins = player1_wins if player_index == 0 else player2_wins
-
-            player.render(
-                self.canvas,
-                w_transform,
-                h_transform,
-                no_tiles_but_wall=no_tiles_but_wall,
-                wins=wins,
-                highlight_lines=player_choice == "line",
-                partial_move=partial_tile_move,
-            )
-
-        # Factory Display
-        for index in range(len(self.factories)):
-            pos = self.factory_position(index)
-
-            highlighted_tile = None
-            if partial_move and partial_move.factory_index == index:
-                highlighted_tile = partial_move.drawing
-
-            self.render_factory(
-                index,
-                self.canvas,
-                int(pos.x),
-                int(pos.y),
-                no_tiles=no_tiles_but_wall,
-                player_choice=player_choice,
-                highlighted_tile=highlighted_tile,
-                is_tile_hovered=partial_move is not None,
-            )
-
-        # Center pile
-        # Create actual tiles, not the counter
-        if not no_tiles_but_wall:
-            types: List[Union[Tile, Literal[6]]] = [
-                STARTING_MARKER,
-                *TILE_TYPES,
-            ]
-
-            for tile_type in types:
-                positions = self.get_rendering_positions(tile_type, center_pile=True)
-
-                for position in positions:
-                    faded = partial_move is not None and (
-                        partial_move.factory_index != -1
-                        or partial_move.drawing != tile_type
-                    )
-                    if (
-                        partial_move
-                        and partial_move.factory_index == -1
-                        and tile_type == STARTING_MARKER
-                    ):
-                        faded = False
-
-                    self.render_tile(tile_type, position, faded=faded)
-
-                    if player_choice is not None:
-                        color = COLOR_RED if player_choice == "tile" else COLOR_GRAY
-                        alpha = FADED_IMAGE_ALPHA if faded else 255
-
-                        self.render_tile_outline(position, color, alpha)
-
-        # Ties
-        if ties != -1:
-            text = self.main_font.render(f"Ties: {ties}", True, COLOR_BLACK)
-            text_rect = text.get_rect(
-                center=(
-                    PLAYER_WIDTH + CENTER_SIZE / 2,
-                    CENTER_SIZE - SCORE_HEIGHT / 2,
-                )
-            )
-            self.canvas.blit(text, text_rect)

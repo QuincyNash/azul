@@ -1,6 +1,5 @@
 import time
 from constants import *
-from typing import Union
 from evaluation import load_player_eval
 from game import Game
 from animation import Animation
@@ -15,7 +14,7 @@ if __name__ == "__main__":
     eval_version = load_player_eval(EVALUATION_VERSION)
     graphics_info = graphics.init()
 
-    game = Game(graphics_info)
+    game = Game()
     game.from_json(json.load(open("game_state.json")))
 
     pygame.event.set_allowed([pygame.QUIT])
@@ -32,7 +31,9 @@ if __name__ == "__main__":
     parent_connection = None
     process = None
 
-    game.render(player_choice=choice, partial_tile_move=partial)
+    graphics.render_game(
+        game, graphics_info, player_choice=choice, partial_tile_move=partial
+    )
     pygame.display.update()
 
     while not quit:
@@ -42,13 +43,13 @@ if __name__ == "__main__":
 
             if event.type == pygame.MOUSEBUTTONUP and turn == 0:
                 if choice == "tile":
-                    partial_move = game.get_hovered_partial_move()
+                    partial_move = graphics.get_hovered_partial_move(game)
                     if partial_move:
                         choice = "line"
                         partial = partial_move
 
                 elif choice == "line" and partial:
-                    move = game.get_hovered_move(partial)
+                    move = graphics.get_hovered_move(game, partial)
                     if move:
                         game.make_move(turn, move)
                         new_game = game.copy()
@@ -82,10 +83,12 @@ if __name__ == "__main__":
                     if turn == 0:
                         choice = "tile"
 
-                game.render(player_choice=choice, partial_tile_move=partial)
+                graphics.render_game(
+                    game, graphics_info, player_choice=choice, partial_tile_move=partial
+                )
                 pygame.display.update()
             else:
-                game.render(no_tiles_but_wall=True)
+                graphics.render_game(game, graphics_info, no_tiles_but_wall=True)
                 animation.render()
                 pygame.display.update()
 
@@ -98,7 +101,9 @@ if __name__ == "__main__":
 
                 animation = Animation(turn, game, None, new_game, graphics_info)
 
-                game.render(player_choice=choice, partial_tile_move=partial)
+                graphics.render_game(
+                    game, graphics_info, player_choice=choice, partial_tile_move=partial
+                )
                 pygame.display.update()
             elif turn == 1 and not process:
                 parent_connection, child_connection = Pipe()
@@ -112,7 +117,9 @@ if __name__ == "__main__":
                 time.sleep(0.1)
                 process.start()
 
-            game.render(player_choice=choice, partial_tile_move=partial)
+            graphics.render_game(
+                game, graphics_info, player_choice=choice, partial_tile_move=partial
+            )
             pygame.display.update()
 
         if parent_connection and parent_connection.poll():

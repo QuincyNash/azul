@@ -1,7 +1,8 @@
+from __future__ import annotations
 from typing import Callable, TypedDict, List
 from constants import *
-from game import PointsResult, Move
 from importlib import import_module
+from game import PointsResult, Move
 
 
 class EvaluationVersion(TypedDict):

@@ -1,21 +1,18 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from constants import *
-from typing import TYPE_CHECKING, Union, Literal
-import pygame
-
-
-if TYPE_CHECKING:
-    from graphics import GraphicsInfo
-    from game import Game, Move
+from typing import Union, Literal
+import graphics
+from utils import Vector
+from game import Game, Move
 
 
 # Stores the data about a tile that is being animated
 @dataclass
 class AnimatingTile:
     tile: Union[Tile, Literal[6]]
-    position: pygame.math.Vector2
-    new_position: pygame.math.Vector2
+    position: Vector
+    new_position: Vector
 
     def __post_init__(self) -> None:
         self.movement = (self.new_position - self.position) / (
@@ -30,7 +27,7 @@ class Animation:
         old_game: Game,
         move: Union[Move, None],
         new_game: Game,
-        graphics_info: GraphicsInfo,
+        graphics_info: graphics.GraphicsInfo,
     ) -> None:
         # Unpack graphics variables
         if graphics_info:
@@ -59,13 +56,15 @@ class Animation:
                     line = self.old_game.players[player_index].pattern_lines[line_index]
 
                     if line.space == 0 and line.tile != EMPTY:
-                        old_position = old_game.get_rendering_positions(
+                        old_position = graphics.get_game_rendering_positions(
+                            old_game,
                             line.tile,
                             player_index=player_index,
                             player_type="pattern_line",
                             line_index=line_index,
                         )[-1]
-                        new_position = new_game.get_rendering_positions(
+                        new_position = graphics.get_game_rendering_positions(
+                            new_game,
                             line.tile,
                             player_index=player_index,
                             player_type="wall",
@@ -79,16 +78,19 @@ class Animation:
             if len(move.floor_tiles) > 0:
                 for tile in TILE_TYPES:
                     if move.is_center_draw:
-                        positions = old_game.get_rendering_positions(
-                            tile, center_pile=True
+                        positions = graphics.get_game_rendering_positions(
+                            old_game, tile, center_pile=True
                         )
                     else:
-                        positions = old_game.get_rendering_positions(
-                            tile, factory_index=move.factory_index
+                        positions = graphics.get_game_rendering_positions(
+                            old_game, tile, factory_index=move.factory_index
                         )
 
-                    new_positions = new_game.get_rendering_positions(
-                        tile, player_index=move.player_index, player_type="floor"
+                    new_positions = graphics.get_game_rendering_positions(
+                        new_game,
+                        tile,
+                        player_index=move.player_index,
+                        player_type="floor",
                     )
 
                     # Exclude tiles that already existed on the floor
@@ -105,11 +107,14 @@ class Animation:
 
             if move.first_draw_from_center:
                 # Animate starting marker
-                position = old_game.get_rendering_positions(
-                    STARTING_MARKER, center_pile=True
+                position = graphics.get_game_rendering_positions(
+                    old_game, STARTING_MARKER, center_pile=True
                 )[0]
-                new_position = new_game.get_rendering_positions(
-                    STARTING_MARKER, player_index=move.player_index, player_type="floor"
+                new_position = graphics.get_game_rendering_positions(
+                    new_game,
+                    STARTING_MARKER,
+                    player_index=move.player_index,
+                    player_type="floor",
                 )[0]
                 self.tiles.append(
                     AnimatingTile(STARTING_MARKER, position, new_position)
@@ -117,11 +122,17 @@ class Animation:
 
                 # Animate tiles that were already on the floor
                 for tile in TILE_TYPES:
-                    positions = old_game.get_rendering_positions(
-                        tile, player_index=move.player_index, player_type="floor"
+                    positions = graphics.get_game_rendering_positions(
+                        old_game,
+                        tile,
+                        player_index=move.player_index,
+                        player_type="floor",
                     )
-                    new_positions = new_game.get_rendering_positions(
-                        tile, player_index=move.player_index, player_type="floor"
+                    new_positions = graphics.get_game_rendering_positions(
+                        new_game,
+                        tile,
+                        player_index=move.player_index,
+                        player_type="floor",
                     )
 
                     for index in range(len(positions)):
@@ -131,14 +142,15 @@ class Animation:
 
             # Animate the drawn tiles to pattern lines
             if move.is_center_draw:
-                positions = old_game.get_rendering_positions(
-                    move.drawing, center_pile=True
+                positions = graphics.get_game_rendering_positions(
+                    old_game, move.drawing, center_pile=True
                 )
             else:
-                positions = old_game.get_rendering_positions(
-                    move.drawing, factory_index=move.factory_index
+                positions = graphics.get_game_rendering_positions(
+                    old_game, move.drawing, factory_index=move.factory_index
                 )
-            new_positions = new_game.get_rendering_positions(
+            new_positions = graphics.get_game_rendering_positions(
+                new_game,
                 move.drawing,
                 player_index=move.player_index,
                 player_type="pattern_line",
@@ -157,11 +169,11 @@ class Animation:
             if not move.is_center_draw:
                 for tile in TILE_TYPES:
                     if tile != move.drawing:
-                        positions = old_game.get_rendering_positions(
-                            tile, factory_index=move.factory_index
+                        positions = graphics.get_game_rendering_positions(
+                            old_game, tile, factory_index=move.factory_index
                         )
-                        new_positions = new_game.get_rendering_positions(
-                            tile, center_pile=True
+                        new_positions = graphics.get_game_rendering_positions(
+                            new_game, tile, center_pile=True
                         )
                         num_old_tiles = old_game.center_pile[tile]
                         new_positions = new_positions[num_old_tiles:]
@@ -177,8 +189,12 @@ class Animation:
 
             # Animate center pile shuffling
             for tile in TILE_TYPES:
-                positions = old_game.get_rendering_positions(tile, center_pile=True)
-                new_positions = new_game.get_rendering_positions(tile, center_pile=True)
+                positions = graphics.get_game_rendering_positions(
+                    old_game, tile, center_pile=True
+                )
+                new_positions = graphics.get_game_rendering_positions(
+                    new_game, tile, center_pile=True
+                )
 
                 max_index = min(len(positions), len(new_positions))
 
@@ -204,15 +220,18 @@ class Animation:
         taken_positions = [tile.position for tile in self.tiles]
 
         for tile in types:
-            positions: List[pygame.math.Vector2] = []
+            positions: List[Vector] = []
 
             positions.extend(
-                self.old_game.get_rendering_positions(tile, center_pile=True)
+                graphics.get_game_rendering_positions(
+                    self.old_game, tile, center_pile=True
+                )
             )
 
             for factory_index in range(FACTORY_COUNT):
                 positions.extend(
-                    self.old_game.get_rendering_positions(
+                    graphics.get_game_rendering_positions(
+                        self.old_game,
                         tile,
                         factory_index=factory_index,
                     )
@@ -220,14 +239,18 @@ class Animation:
 
             for player_index in [0, 1]:
                 positions.extend(
-                    self.old_game.get_rendering_positions(
-                        tile, player_index=player_index, player_type="floor"
+                    graphics.get_game_rendering_positions(
+                        self.old_game,
+                        tile,
+                        player_index=player_index,
+                        player_type="floor",
                     )
                 )
 
                 for line_index in range(WALL_SIZE):
                     positions.extend(
-                        self.old_game.get_rendering_positions(
+                        graphics.get_game_rendering_positions(
+                            self.old_game,
                             tile,
                             player_index=player_index,
                             player_type="pattern_line",

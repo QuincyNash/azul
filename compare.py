@@ -22,7 +22,7 @@ player2_eval = load_player_eval(PLAYER2_COMPARE_VERSION)
 # Return of 0 represents draw, 1 represents player 1 win, 2 represents player 2 win
 def play_game(move_time: float) -> int:
     turn = random.randint(0, 1)
-    game = Game(graphics_info=None)
+    game = Game()
 
     while not game.is_game_over():
         if game.is_round_over():
