@@ -1,4 +1,3 @@
-import time
 from constants import *
 from evaluation import load_player_eval
 from game import Game
@@ -114,7 +113,6 @@ if __name__ == "__main__":
                     kwargs={"connection": child_connection},
                     daemon=True,
                 )
-                time.sleep(0.1)
                 process.start()
 
             graphics.render_game(
