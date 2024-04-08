@@ -126,12 +126,17 @@ def negascout(
 
     # # Make sure that the game is not on the first turn of the tree (leads to problems with EvaluatedNode vs. FinalResult)
     if depth < max_depth and (depth == 0 or game.are_no_moves()):
-        points_results = game.calculate_points(flag="include_bonus")
+        points_results = game.calculate_points()
 
         # Flip heuristic for player 2
         return EvaluatedNode(
             score=game_evaluation_for_player(
-                turn, points_results, player_eval["player_evaluation"]
+                turn,
+                game,
+                game.players[0],
+                game.players[1],
+                points_results,
+                player_eval["player_evaluation"],
             ),
             unique_nodes_searched=1,
             nodes_searched=1,

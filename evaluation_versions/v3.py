@@ -1,4 +1,5 @@
-from game import Move, PointChange, PointsResult
+from game import Game, Move, PointChange, PointsResult
+from player import Player
 
 
 def future_point_change_score(change: PointChange) -> float:
@@ -24,7 +25,7 @@ def future_point_change_score(change: PointChange) -> float:
 
 
 # Evaluates a players position
-def player_evaluation(points_result: PointsResult) -> float:
+def player_evaluation(game: Game, player: Player, points_result: PointsResult) -> float:
     basic_points = (
         sum(
             (change.points if change.completed else 0)

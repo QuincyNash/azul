@@ -1,9 +1,11 @@
-from game import Move, PointsResult
+from game import Game, Move, PointsResult
 import random
+
+from player import Player
 
 
 # Evaluates a players position
-def player_evaluation(points_result: PointsResult) -> float:
+def player_evaluation(game: Game, player: Player, points_result: PointsResult) -> float:
     return random.random()
 
 
