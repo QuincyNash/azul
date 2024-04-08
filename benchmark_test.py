@@ -37,12 +37,18 @@ def test_undo_move(benchmark: Benchmark):
 
 def test_points(benchmark: Benchmark):
     game = Game(seed=0)
-    func = lambda: game.calculate_points(flag="include_bonus")
+    func = lambda: game.calculate_points()
     benchmark(func)
 
 
 def test_evaluation(benchmark: Benchmark):
     game = Game(seed=0)
-    points_result = game.calculate_points(flag="include_bonus")
-    player_eval = load_player_eval("v3")
-    benchmark(game_evaluation, points_result, player_eval["player_evaluation"])
+    points_result = game.calculate_points()
+    player_eval = load_player_eval("v4")
+    benchmark(
+        game_evaluation,
+        game,
+        game.players[0],
+        points_result,
+        player_eval["player_evaluation"],
+    )

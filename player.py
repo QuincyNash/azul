@@ -14,6 +14,13 @@ class PatternLine:
         return BYTE_CONVERSION[self.tile] + bytes(self.space)
 
 
+@dataclass(slots=True)
+class PlayerBonuses:
+    row: List[bool]
+    col: List[bool]
+    diagonal: List[bool]
+
+
 class Player:
     def __init__(self, index: int) -> None:
         # Index of player in Game.players list
@@ -35,6 +42,13 @@ class Player:
 
         # Tiles that are not placed in a pattern line
         self.floor: List[Union[Tile, Literal[6]]] = []
+
+        # Keeps track of completed bonuses so they aren't double counted
+        self.bonuses: PlayerBonuses = PlayerBonuses(
+            [False for _ in range(WALL_SIZE)],
+            [False for _ in range(WALL_SIZE)],
+            [False for _ in range(WALL_SIZE)],
+        )
 
     # Printable version of Player
     def __str__(self) -> str:

@@ -44,72 +44,45 @@ def test_game_points():
     og_game = game.copy()
     og_serialized = game.serialize()
 
-    game2 = og_game.copy()
-    game2.calculate_points(flag="normal", modify_game=True)
-
-    game3 = og_game.copy()
-    game3.players[0].wall[2][2] = True
-    game3.calculate_points(flag="bonus_only", modify_game=True)
-
     game = og_game.copy()
-    game.calculate_points(flag="include_bonus", modify_game=True)
+    game.calculate_points(modify_game=True)
 
     assert og_serialized != game.serialize()
-    assert og_serialized != game2.serialize()
-    assert og_serialized != game3.serialize()
 
     assert (
         game.players[0].points
         == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS + 10
     )
-    assert game2.players[0].points == 10
-    assert (
-        game3.players[0].points
-        == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
-    )
 
-    game2_points = og_game.calculate_points(flag="normal")[0]
-
-    game3 = og_game.copy()
-    game3.players[0].wall[2][2] = True
-    game3_points = game3.calculate_points(flag="bonus_only")[0]
-
-    game_points = og_game.calculate_points(flag="include_bonus")[0]
+    game_points = og_game.calculate_points()[0]
 
     assert og_game.serialize() == og_serialized
 
     assert isinstance(game_points.point_changes[0], PointChange)
-    assert game2_points.bonus_points == 0 and game2_points.negative_floor_points == 0
-    assert (
-        game3_points.bonus_points
-        == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
-        and game3_points.negative_floor_points == 0
-    )
     assert (
         game_points.bonus_points
         == FIVE_OF_A_KIND_BONUS + VERTICAL_LINE_BONUS + HORIZONTAL_LINE_BONUS
         and game_points.negative_floor_points == 0
     )
-    for g_points in [game_points, game2_points]:
-        assert (
-            sum(
-                [
-                    (change.points if change.completed else 0)
-                    for change in g_points.point_changes
-                ]
-            )
-            == 10
+    assert (
+        sum(
+            [
+                (change.points if change.completed else 0)
+                for change in game_points.point_changes
+            ]
         )
-        assert (
-            sum(
-                [
-                    (change.points if not change.completed else 0)
-                    for change in g_points.point_changes
-                ]
-            )
-            == 1
+        == 10
+    )
+    assert (
+        sum(
+            [
+                (change.points if not change.completed else 0)
+                for change in game_points.point_changes
+            ]
         )
-        assert g_points.point_changes[1].space_left == 2
+        == 1
+    )
+    assert game_points.point_changes[1].space_left == 2
 
     game = Game(seed=0)
     game.players[0].wall[2][1] = True
@@ -119,7 +92,7 @@ def test_game_points():
 
     game_points = game.calculate_points()
     assert game_points[0].point_changes[0].completed == False
-    assert game_points[0].point_changes[0].points == 4
+    assert game_points[0].point_changes[0].points == 3
     assert game_points[0].point_changes[0].space_left == 2
 
 

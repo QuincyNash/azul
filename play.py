@@ -14,7 +14,7 @@ if __name__ == "__main__":
     graphics_info = graphics.init()
 
     game = Game()
-    game.from_json(json.load(open("game_state.json")))
+    # game.from_json(json.load(open("game_state.json")))
 
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
@@ -69,7 +69,6 @@ if __name__ == "__main__":
 
                     # If the game is over, calcuolate the final score and end the game
                     if game.is_game_over():
-                        game.calculate_points_and_modify(flag="bonus_only")
                         end = True
                     else:
                         turn = game.new_round()

@@ -41,8 +41,6 @@ def play_game(move_time: float) -> int:
             game.make_move(turn, result.move)
             turn = (turn + 1) % 2
 
-    game.calculate_points_and_modify(flag="bonus_only")
-
     score_difference = game.players[0].points - game.players[1].points
     if score_difference > 0:
         return 1

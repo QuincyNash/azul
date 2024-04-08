@@ -23,7 +23,9 @@ class PartialMove:
     amount: int
     moving_to_center: Factory
     player_index: int  # Index of player in Game.players list
-    factory_index: int  # Index of factory in Game.factories list, if center pile, then index is -1
+    factory_index: (
+        int  # Index of factory in Game.factories list, if center pile, then index is -1
+    )
     is_center_draw: bool
     first_draw_from_center: bool
 
@@ -271,40 +273,69 @@ class Game:
             factory.update(move.moving_to_center)
 
     def calculate_potential_points(
-        self, wall: List[List[bool]], tile: Tile, row_index: int
+        self, player: Player, tile: Tile, row_index: int
     ) -> int:
         column_index = TILE_POSITIONS[tile][row_index]
         potential_points = 1  # Count the tile that was placed
         horizontal_movement = False
+        vertical_movement = False
 
         # Count all placed tiles in each row and column
         for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             # Continue counting while tiles are filled and exist
             xpos, ypos = column_index + xdir, row_index + ydir
-            while 0 <= xpos < WALL_SIZE and 0 <= ypos < WALL_SIZE and wall[ypos][xpos]:
+            while (
+                0 <= xpos < WALL_SIZE
+                and 0 <= ypos < WALL_SIZE
+                and player.wall[ypos][xpos]
+            ):
                 potential_points += 1
                 xpos += xdir
                 ypos += ydir
                 # There is a tile left or right of the placed tile, so count the placed tile twice
                 if xdir != 0:
                     horizontal_movement = True
+                if ydir != 0:
+                    vertical_movement = True
 
-        return potential_points + horizontal_movement
+        return potential_points + (
+            1 if horizontal_movement and vertical_movement else 0
+        )
 
-    def calculate_bonus_points(self, wall: List[List[bool]]) -> int:
+    def calculate_potential_bonus_points(
+        self, player: Player, tile: Tile, row_index: int
+    ) -> int:
+        column_index = TILE_POSITIONS[tile][row_index]
+
+        # Add tile to wall temporarily to calculate bonus points
+        player.wall[row_index][column_index] = True
+        bonus_points = self.calculate_bonus_points(player, modify_player=False)
+        player.wall[row_index][column_index] = False
+
+        return bonus_points
+
+    def calculate_bonus_points(self, player: Player, modify_player: bool = True) -> int:
         bonus_points = 0
 
-        for row in wall:
-            if all(row):
+        for row_index, row in enumerate(player.wall):
+            if not player.bonuses.row[row_index] and all(row):
                 bonus_points += HORIZONTAL_LINE_BONUS
+                if modify_player:
+                    player.bonuses.row[row_index] = True
 
-        for column in zip(*wall):
-            if all(column):
+        for column_index, column in enumerate(zip(*player.wall)):
+            if not player.bonuses.col[column_index] and all(column):
                 bonus_points += VERTICAL_LINE_BONUS
+                if modify_player:
+                    player.bonuses.col[column_index] = True
 
-        for tile in TILE_TYPES:
-            if all(wall[row][TILE_POSITIONS[tile][row]] for row in range(WALL_SIZE)):
+        for tile_index, tile in enumerate(TILE_TYPES):
+            if not player.bonuses.diagonal[tile_index] and all(
+                player.wall[row][TILE_POSITIONS[tile][row]] for row in range(WALL_SIZE)
+            ):
                 bonus_points += FIVE_OF_A_KIND_BONUS
+                if modify_player:
+                    player.bonuses.diagonal[tile_index] = True
 
         return bonus_points
 
@@ -314,15 +345,12 @@ class Game:
         # Floor points are stored in NEGATIVE_FLOOR_POINTS (sum the first n which are occupied)
         return sum(NEGATIVE_FLOOR_POINTS[: len(floor)])
 
-    def calculate_points_and_modify(
-        self, *, flag: Literal["bonus_only", "include_bonus", "normal"] = "normal"
-    ) -> None:
-        self.calculate_points(flag=flag, modify_game=True)
+    def calculate_points_and_modify(self) -> None:
+        self.calculate_points(modify_game=True)
 
     def calculate_points(
         self,
         *,
-        flag: Literal["bonus_only", "include_bonus", "normal"] = "normal",
         modify_game=False,
     ) -> List[PointsResult]:
         results: List[PointsResult] = []
@@ -338,57 +366,58 @@ class Game:
             wall, pattern_lines = player.wall, player.pattern_lines
 
             # Bonus only does not move tiles from pattern lines to the wall
-            if flag != "bonus_only":
-                for row_index, line in enumerate(pattern_lines):
-                    if line.space == 0 and line.tile != EMPTY:
-                        column_index = TILE_POSITIONS[line.tile][row_index]
+            for row_index, line in enumerate(pattern_lines):
+                if line.space == 0 and line.tile != EMPTY:
+                    column_index = TILE_POSITIONS[line.tile][row_index]
 
-                        # Add tile to wall even if not modified, if modified, remove later
-                        wall[row_index][column_index] = True
+                    # Add tile to wall even if not modified, if modified, remove later
+                    wall[row_index][column_index] = True
 
-                        potential_points = self.calculate_potential_points(
-                            wall, line.tile, row_index
-                        )
-                        total_positive_points += potential_points
+                    potential_points = self.calculate_potential_points(
+                        player, line.tile, row_index
+                    )
+                    total_positive_points += potential_points
 
-                        if modify_game:
-                            player.points += potential_points
-                            # Remove tiles from pattern line
-                            pattern_lines[row_index].space = row_index + 1
-                            pattern_lines[row_index].tile = EMPTY
-                        else:
-                            point_changes.append(
-                                PointChange(
-                                    row_index,
-                                    line.tile,
-                                    potential_points,
-                                    space_left=0,
-                                    completed=True,
-                                )
-                            )
-
-                    # Pattern line is not full but contains some tiles, so calculate the potential points once the row is complete
-                    elif line.tile != EMPTY and not modify_game:
-                        potential_points = self.calculate_potential_points(
-                            wall, line.tile, row_index
-                        )
+                    if modify_game:
+                        player.points += potential_points
+                        # Remove tiles from pattern line
+                        pattern_lines[row_index].space = row_index + 1
+                        pattern_lines[row_index].tile = EMPTY
+                    else:
                         point_changes.append(
                             PointChange(
                                 row_index,
                                 line.tile,
                                 potential_points,
-                                space_left=line.space,
-                                completed=False,
+                                space_left=0,
+                                completed=True,
                             )
                         )
 
-            # Calculate bonus points
-            if flag in ["include_bonus", "bonus_only"]:
-                bonus_points = self.calculate_bonus_points(player.wall)
-                total_positive_points += bonus_points
+                # Pattern line is not full but contains some tiles, so calculate the potential points once the row is complete
+                elif line.tile != EMPTY and not modify_game:
+                    potential_points = self.calculate_potential_points(
+                        player, line.tile, row_index
+                    ) + self.calculate_potential_bonus_points(
+                        player, line.tile, row_index
+                    )  # Also count the additional points from the bonus
 
-                if modify_game:
-                    player.points += bonus_points
+                    point_changes.append(
+                        PointChange(
+                            row_index,
+                            line.tile,
+                            potential_points,
+                            space_left=line.space,
+                            completed=False,
+                        )
+                    )
+
+            # Calculate bonus points
+            bonus_points = self.calculate_bonus_points(player, modify_game)
+            total_positive_points += bonus_points
+
+            if modify_game:
+                player.points += bonus_points
 
             # Reset wall tiles
             for point_change in point_changes:
@@ -396,18 +425,17 @@ class Game:
                     TILE_POSITIONS[point_change.tile][point_change.pattern_line]
                 ] = False
 
-            if flag != "bonus_only":
-                # Points can't go below 0
-                floor_negative_points = min(
-                    self.calculate_negative_floor_points(player.floor),
-                    total_positive_points
-                    + old_player_points,  # Negative points cannot go below the previous points of the player added to the new positive points
-                )
+            # Points can't go below 0
+            floor_negative_points = min(
+                self.calculate_negative_floor_points(player.floor),
+                total_positive_points
+                + old_player_points,  # Negative points cannot go below the previous points of the player added to the new positive points
+            )
 
-                if modify_game:
-                    player.points -= floor_negative_points
-                    # And remove the floor tiles
-                    player.floor = []
+            if modify_game:
+                player.points -= floor_negative_points
+                # And remove the floor tiles
+                player.floor = []
 
             results.append(
                 PointsResult(point_changes, bonus_points, floor_negative_points)
