@@ -41,7 +41,20 @@ def test_points(benchmark: Benchmark):
     benchmark(func)
 
 
-def test_evaluation(benchmark: Benchmark):
+def test_evaluation_v3(benchmark: Benchmark):
+    game = Game(seed=0)
+    points_result = game.calculate_points()
+    player_eval = load_player_eval("v3")
+    benchmark(
+        game_evaluation,
+        game,
+        game.players[0],
+        points_result,
+        player_eval["player_evaluation"],
+    )
+
+
+def test_evaluation_v4(benchmark: Benchmark):
     game = Game(seed=0)
     points_result = game.calculate_points()
     player_eval = load_player_eval("v4")
