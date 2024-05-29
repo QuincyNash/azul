@@ -46,6 +46,7 @@ def get_best_move(
     *,
     show_progress: bool = True,
     connection: Union[Connection, None] = None,
+    depth_limit: Union[int, None] = None,
 ) -> FinalResult:
     total_nodes = 0
     unique_nodes = 0
@@ -56,7 +57,10 @@ def get_best_move(
     player_eval = player1_eval if turn == 0 else player2_eval
 
     # Iterative deepening
-    for depth in range(1, 4 * FACTORY_COUNT + 1):
+    if depth_limit is None:
+        depth_limit = 4 * FACTORY_COUNT
+
+    for depth in range(1, depth_limit + 1):
         if connection != None:
             connection.send({"data": depth, "type": DEPTH})
 
@@ -93,7 +97,9 @@ def get_best_move(
     if isinstance(result, FinalResult):
         result.move = pickle.loads(pickle.dumps(result.move, -1))
         result.nodes_searched = total_nodes
-        print(f"{result.nodes_searched / COMPUTER_MOVE_TIME} nodes/second")
+
+        # print(result.score)
+        # print(f"{result.nodes_searched / COMPUTER_MOVE_TIME} nodes/second")
 
         if connection != None:
             connection.send({"data": result, "type": BEST_MOVE})
