@@ -11,9 +11,18 @@ class EvaluationVersion(TypedDict):
     move_potential: Callable[[Move], float]
 
 
-def load_player_eval(version: str) -> EvaluationVersion:
+def load_player_eval(
+    version: str, *, nn_weights: Union[List[float], None] = None
+) -> EvaluationVersion:
     module = import_module(f"evaluation_versions.{version}")
-    evaluation = module.player_evaluation
+
+    if hasattr(module, "player_evaluation"):
+        evaluation = module.player_evaluation
+    elif nn_weights is None:
+        evaluation = module.create_player_evaluation()
+    else:
+        evaluation = module.create_player_evaluation(nn_weights)
+
     potential = module.move_potential
     return {
         "player_evaluation": evaluation,
@@ -24,14 +33,15 @@ def load_player_eval(version: str) -> EvaluationVersion:
 # Evaluation always ranks the position from the point of view of player 1
 def game_evaluation(
     game: Game,
-    player: Player,
+    player1: Player,
+    player2: Player,
     points_results: List[PointsResult],
     player_evaluation: Callable[[Game, Player, PointsResult], float],
 ) -> float:
-    player1 = player_evaluation(game, player, points_results[0])
-    player2 = player_evaluation(game, player, points_results[1])
+    player1_eval = player_evaluation(game, player1, points_results[0])
+    player2_eval = player_evaluation(game, player2, points_results[1])
 
-    return player1 - player2
+    return player1_eval - player2_eval
 
 
 # Considers who the active player is
@@ -44,5 +54,6 @@ def game_evaluation_for_player(
     player_evaluation: Callable[[Game, Player, PointsResult], float],
 ) -> float:
     multiplier = 1 if turn == 0 else -1
-    player = player1 if turn == 0 else player2
-    return multiplier * game_evaluation(game, player, points_results, player_evaluation)
+    return multiplier * game_evaluation(
+        game, player1, player2, points_results, player_evaluation
+    )
