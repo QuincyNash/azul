@@ -19,8 +19,8 @@ if __name__ == "__main__":
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
 
-    turn = 1
-    choice = None
+    turn = 0
+    choice = "tile"
     new_game = game.copy()
     quit = False
     end = None
