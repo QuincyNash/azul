@@ -1,15 +1,14 @@
-from typing import Literal, List, Dict, Union
+from typing import Literal, List, Dict, Tuple, Union
 
 
 COMPUTER_MOVE_TIME = 5  # seconds
-EVALUATION_VERSION = "v3"
+EVALUATION_VERSION = "v4"
 
 
-COMPARE_COMPUTER_MOVE_TIME = 0.2  # seconds
-NUM_COMPARE_ROUNDS = 100
+COMPARE_COMPUTER_MOVE_TIME = 0.1  # seconds
+NUM_COMPARE_ROUNDS = 500
 PLAYER1_COMPARE_VERSION = "v3"
 PLAYER2_COMPARE_VERSION = "v2"
-
 
 FACTORY_COUNT = 5
 NUM_EACH_TILE = 20
@@ -19,6 +18,8 @@ NEGATIVE_FLOOR_POINTS = [1, 1, 2, 2, 2, 3, 3]
 HORIZONTAL_LINE_BONUS = 2
 VERTICAL_LINE_BONUS = 7
 FIVE_OF_A_KIND_BONUS = 10
+# Measures the importance of future points based on the longest line in the game
+ENDGAME_IMPORTANCE_SCORES: List[float] = [1, 0.9, 0.7, 0.5, 0.1]
 
 ANIMATION_SECONDS = 1
 PAUSE_TIME_AFTER_MOVE = 1
@@ -98,6 +99,30 @@ WALL_TILES: List[List[Tile]] = [
     [BLACK, STAR, BLUE, YELLOW, RED],
     [RED, BLACK, STAR, BLUE, YELLOW],
     [YELLOW, RED, BLACK, STAR, BLUE],
+]
+
+# Extra Information
+# Stored as dictionary where the first key is the total number of tiles in the partition, and the second key is the number of partitions
+# The partition itself is a dictionary with the number of tile draws of each size
+PARTITIONS: Dict[int, Dict[int, List[Dict[int, int]]]] = {
+    1: {1: [{1: 1}]},
+    2: {1: [{2: 1}], 2: [{1: 2}]},
+    3: {1: [{3: 1}], 2: [{1: 1, 2: 1}], 3: [{1: 3}]},
+    4: {1: [{4: 1}], 2: [{3: 1, 1: 1}, {2: 2}], 3: [{2: 1, 1: 2}], 4: [{1: 4}]},
+    5: {
+        1: [{5: 1}],
+        2: [{4: 1, 1: 1}, {3: 1, 2: 1}],
+        3: [{3: 1, 1: 2}, {2: 2, 1: 1}],
+        4: [{2: 1, 1: 3}],
+        5: [{1: 5}],
+    },
+}
+REGRESSION_CONSTANTS: List[Tuple[float, float]] = [
+    (0, 1),
+    (2.233, 21.77),
+    (2.051, 28.61),
+    (1.691, 33.85),
+    (1.583, 106.5),
 ]
 
 # Colors
