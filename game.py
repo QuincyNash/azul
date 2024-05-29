@@ -63,6 +63,8 @@ class Game:
         # Create factories and populate each with 4 random tiles
         self.factories: List[Factory] = [Counter() for _ in range(FACTORY_COUNT)]
 
+        self.is_first_round = True
+
         # Center pile starts empty (flagged for identification later)
         self.center_pile: Factory = Counter()
         self.center_pile[STARTING_MARKER] = 1
@@ -162,22 +164,61 @@ class Game:
         self.factories = list(map(self.readable_factory_to_factory, json["factories"]))
         self.center_pile = self.readable_factory_to_factory(json["center_pile"])
 
-    def serialize(self) -> bytes:
-        result: bytes = b""
+    def serialize(self, points_results: List[PointsResult]) -> str:
+        basic_points = 0
+        for player_index in [0, 1]:
+            points = (
+                sum(
+                    (change.points if change.completed else 0)
+                    for change in points_results[player_index].point_changes
+                )
+                - points_results[player_index].negative_floor_points
+                + points_results[player_index].bonus_points
+            )
+            points *= -1 if player_index == 1 else 1
+            basic_points += points
 
-        factory_numbers = list(map(self.get_factory_number, self.factories))
-        factory_numbers.sort()
-        factory_numbers.append(self.get_factory_number(self.center_pile))
-        result += b"".join(factory_numbers)
+        def get_point_change(player_index: int, row: int) -> Union[PointChange, None]:
+            for change in points_results[player_index].point_changes:
+                if change.pattern_line == row:
+                    return change
 
-        for player in self.players:
-            result += bytes(player.has_starting_marker)
-            result += bytes(len(player.floor))
-            result += bytes(player.points)
-            result += b"".join(map(bytes, player.pattern_lines))
-            result += b"".join(map(bytes, player.wall))
+            return None
 
-        return result
+        inputs: List[int] = [basic_points]
+
+        for player_index, player in enumerate(self.players):
+            for tile in TILE_TYPES:
+                for factory in [*self.factories, self.center_pile]:
+                    inputs.append(factory[tile])
+            inputs.append(self.center_pile[STARTING_MARKER])
+
+            for row, line in enumerate(player.pattern_lines):
+                inputs.append(line.space)
+                inputs.append(int(line.tile))
+
+                point_change = get_point_change(player_index, row)
+                if point_change and not point_change.completed:
+                    potential_points = point_change.points
+                else:
+                    potential_points = 0
+
+                inputs.append(potential_points)
+
+            for row in player.wall:
+                inputs.extend(map(int, row))
+
+            inputs.append(len(player.floor))
+            inputs.append(int(player.has_starting_marker))
+
+        most_tiles_in_row = 0
+        for test_player in self.players:
+            for row in range(WALL_SIZE):
+                tiles_in_row = sum(test_player.wall[row])
+                most_tiles_in_row = max(most_tiles_in_row, tiles_in_row)
+        inputs.append(WALL_SIZE - most_tiles_in_row)
+
+        return ",".join(map(str, inputs))
 
     # Round is over if factories and center pile are empty
     def is_round_over(self) -> bool:
@@ -212,6 +253,8 @@ class Game:
 
         self.players[0].has_starting_marker = False
         self.players[1].has_starting_marker = False
+
+        self.is_first_round = False
 
         return first_player
 
@@ -281,7 +324,7 @@ class Game:
             factory.update(move.moving_to_center)
 
     def calculate_potential_points(
-        self, player: Player, tile: Tile, row_index: int
+        self, wall: List[List[bool]], tile: Tile, row_index: int
     ) -> int:
         column_index = TILE_POSITIONS[tile][row_index]
         potential_points = 1  # Count the tile that was placed
@@ -292,11 +335,7 @@ class Game:
         for xdir, ydir in ((-1, 0), (1, 0), (0, -1), (0, 1)):
             # Continue counting while tiles are filled and exist
             xpos, ypos = column_index + xdir, row_index + ydir
-            while (
-                0 <= xpos < WALL_SIZE
-                and 0 <= ypos < WALL_SIZE
-                and player.wall[ypos][xpos]
-            ):
+            while 0 <= xpos < WALL_SIZE and 0 <= ypos < WALL_SIZE and wall[ypos][xpos]:
                 potential_points += 1
                 xpos += xdir
                 ypos += ydir
@@ -349,11 +388,9 @@ class Game:
 
         return bonus_points
 
-    def calculate_negative_floor_points(
-        self, floor: List[Union[Tile, Literal[6]]]
-    ) -> int:
+    def calculate_negative_floor_points(self, floor_length: int) -> int:
         # Floor points are stored in NEGATIVE_FLOOR_POINTS (sum the first n which are occupied)
-        return sum(NEGATIVE_FLOOR_POINTS[: len(floor)])
+        return sum(NEGATIVE_FLOOR_POINTS[:floor_length])
 
     def calculate_points_and_modify(self) -> None:
         self.calculate_points(modify_game=True)
@@ -386,7 +423,7 @@ class Game:
                     new_wall[row_index][column_index] = True
 
                     potential_points = self.calculate_potential_points(
-                        player, line.tile, row_index
+                        new_wall, line.tile, row_index
                     )
                     total_positive_points += potential_points
 
@@ -414,9 +451,9 @@ class Game:
                 # Pattern line is not full but contains some tiles, so calculate the potential points once the row is complete
                 elif line.tile != EMPTY and not modify_game:
                     potential_points = self.calculate_potential_points(
-                        player, line.tile, row_index
+                        new_wall, line.tile, row_index
                     ) + self.calculate_potential_bonus_points(
-                        player, player.wall, line.tile, row_index
+                        player, new_wall, line.tile, row_index
                     )  # Also count the additional points from the bonus
 
                     point_changes.append(
@@ -438,13 +475,14 @@ class Game:
 
             # Points can't go below 0
             floor_negative_points = min(
-                self.calculate_negative_floor_points(player.floor),
+                self.calculate_negative_floor_points(len(player.floor)),
                 total_positive_points
                 + old_player_points,  # Negative points cannot go below the previous points of the player added to the new positive points
             )
 
             if modify_game:
                 player.points -= floor_negative_points
+                player.wall = new_wall
                 # And remove the floor tiles
                 player.floor = []
 
