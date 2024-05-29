@@ -1,6 +1,7 @@
+import time
 from constants import *
-from typing import TypedDict, Dict
-from evaluation import load_player_eval
+from typing import Any, List, TypedDict, Dict, Union
+from evaluation import EvaluationVersion, load_player_eval
 from game import Game
 from search import get_best_move
 import multiprocessing
@@ -15,14 +16,25 @@ class Score(TypedDict):
     ties: int
 
 
-player1_eval = load_player_eval(PLAYER1_COMPARE_VERSION)
-player2_eval = load_player_eval(PLAYER2_COMPARE_VERSION)
+def unpack(args: List[Any]):
+    return play_game(*args)
 
 
-# Return of 0 represents draw, 1 represents player 1 win, 2 represents player 2 win
-def play_game(move_time: float) -> int:
-    turn = random.randint(0, 1)
-    game = Game()
+# Returns the score difference (positive means player 1 wins)
+def play_game(
+    move_time: float,
+    player1_eval: EvaluationVersion,
+    player2_eval: EvaluationVersion,
+    seed: Union[int, None] = None,
+    first_player: Union[int, None] = None,
+    depth_limit: Union[int, None] = None,
+) -> int:
+    if first_player is not None:
+        turn = first_player
+    else:
+        turn = random.randint(0, 1)
+
+    game = Game(seed=seed)
 
     while not game.is_game_over():
         if game.is_round_over():
@@ -37,20 +49,18 @@ def play_game(move_time: float) -> int:
                 turn,
                 move_time,
                 show_progress=False,
+                depth_limit=depth_limit,
             )
             game.make_move(turn, result.move)
             turn = (turn + 1) % 2
 
-    score_difference = game.players[0].points - game.players[1].points
-    if score_difference > 0:
-        return 1
-    elif score_difference < 0:
-        return 2
-    else:
-        return 0
+    return game.players[0].points - game.players[1].points
 
 
 if __name__ == "__main__":
+    player1_eval = load_player_eval(PLAYER1_COMPARE_VERSION)
+    player2_eval = load_player_eval(PLAYER2_COMPARE_VERSION)
+
     player1_wins = 0
     player2_wins = 0
     ties = 0
@@ -58,8 +68,12 @@ if __name__ == "__main__":
     # Play NUM_COMPARE_ROUNDS games in parallel and record the results
     with multiprocessing.Pool() as pool:
         progress_bar = tqdm(
-            pool.imap_unordered(
-                play_game, [COMPARE_COMPUTER_MOVE_TIME] * NUM_COMPARE_ROUNDS
+            pool.imap(
+                unpack,
+                [
+                    [COMPARE_COMPUTER_MOVE_TIME, player1_eval, player2_eval]
+                    for _ in range(NUM_COMPARE_ROUNDS)
+                ],
             ),
             total=NUM_COMPARE_ROUNDS,
             postfix={"Score": f"{player1_wins}-{player2_wins}-{ties}"},
@@ -68,9 +82,9 @@ if __name__ == "__main__":
         for result in progress_bar:
             if result == 0:
                 ties += 1
-            elif result == 1:
+            elif result > 0:
                 player1_wins += 1
-            elif result == 2:
+            elif result < 0:
                 player2_wins += 1
 
             progress_bar.set_postfix({"Score": f"{player1_wins}-{player2_wins}-{ties}"})
