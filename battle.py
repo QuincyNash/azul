@@ -7,14 +7,13 @@ import graphics
 from search import ConnectionData, FinalResult, get_best_move
 from multiprocessing import Process, Pipe
 import pygame
-import json
 import time
 
 
 if __name__ == "__main__":
     graphics_info = graphics.init()
     game = Game()
-    game.from_json(json.load(open("game_state.json", "r")))
+    # game.from_json(json.load(open("game_state.json", "r")))
 
     pygame.event.set_allowed([pygame.QUIT])
     pygame.display.set_caption("Azul")
@@ -23,7 +22,6 @@ if __name__ == "__main__":
     end = False
     animation: Union[Animation, None] = None
     new_game = game.copy()
-    serialized_game = game.serialize()
     process = None
     child_connection = None
     parent_connection = None
